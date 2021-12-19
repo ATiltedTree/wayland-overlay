@@ -1,0 +1,92 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ffa5d0bb26..a8f4956dae 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -477,10 +477,10 @@ if (Qt5QuickWidgets_FOUND)
+     list (APPEND ANDROID_EXTRA_LIBS $<TARGET_FILE:Qt5::QuickWidgets>)
+ endif()
+ 
+-if (NOT WIN32 AND NOT APPLE AND NOT ANDROID)
+-
+-    find_package(Qt5 ${MIN_QT_VERSION} REQUIRED X11Extras)
++set(HAVE_DBUS FALSE)
++set(HAVE_X11 FALSE)
+ 
++if (NOT WIN32 AND NOT APPLE AND NOT ANDROID)
+     find_package(Qt5DBus ${MIN_QT_VERSION})
+     set(HAVE_DBUS ${Qt5DBus_FOUND})
+     set_package_properties(Qt5DBus PROPERTIES
+@@ -497,16 +497,14 @@ if (NOT WIN32 AND NOT APPLE AND NOT ANDROID)
+         TYPE OPTIONAL
+         PURPOSE "Optionally used to provide crash reporting on Linux")
+ 
+-    find_package(X11 REQUIRED COMPONENTS Xinput)
+-    set(HAVE_X11 TRUE)
+-    add_definitions(-DHAVE_X11)
+-
+-else()
+-    set(HAVE_DBUS FALSE)
+-    set(HAVE_X11 FALSE)
++    find_package(X11 COMPONENTS Xinput)
++    find_package(Qt5X11Extras ${MIN_QT_VERSION})
++    if(Qt5_X11Extras_FOUND AND X11_Xinput_FOUND)
++	    set(HAVE_X11 TRUE)
++	    add_definitions(-DHAVE_X11)
++    endif()
+ endif()
+ 
+-
+ add_definitions(
+   -DQT_USE_QSTRINGBUILDER
+   -DQT_STRICT_ITERATORS
+diff --git a/krita/main.cc b/krita/main.cc
+index e8d16a6059..941b03a430 100644
+--- a/krita/main.cc
++++ b/krita/main.cc
+@@ -488,11 +488,6 @@ extern "C" MAIN_EXPORT int MAIN_FN(int argc, char **argv)
+ 
+     installTranslators(app);
+ 
+-    if (app.platformName() == "wayland") {
+-        QMessageBox::critical(0, i18nc("@title:window", "Fatal Error"), i18n("Krita does not support the Wayland platform. Use XWayland to run Krita on Wayland. Krita will close now."));
+-        return -1;
+-    }
+-
+     KisUsageLogger::writeHeader();
+     KisOpenGL::initialize();
+ 
+diff --git a/libs/ui/CMakeLists.txt b/libs/ui/CMakeLists.txt
+index f83a23e813..0d1a3b6c39 100644
+--- a/libs/ui/CMakeLists.txt
++++ b/libs/ui/CMakeLists.txt
+@@ -664,7 +664,7 @@ if (HAVE_QT_MULTIMEDIA)
+     target_link_libraries(kritaui Qt5::Multimedia)
+ endif()
+ 
+-if (NOT WIN32 AND NOT APPLE AND NOT ANDROID)
++if (X11_FOUND AND X11_Xinput_FOUND)
+   target_link_libraries(kritaui ${X11_X11_LIB}
+                                 ${X11_Xinput_LIB})
+ endif()
+@@ -678,7 +678,7 @@ endif ()
+ target_link_libraries(kritaui ${OPENEXR_LIBRARIES})
+ 
+ # Add VSync disable workaround
+-if(NOT WIN32 AND NOT APPLE AND NOT ANDROID)
++if(Qt5_X11Extras_FOUND)
+     target_link_libraries(kritaui ${CMAKE_DL_LIBS} Qt5::X11Extras)
+ endif()
+ 
+diff --git a/libs/widgets/CMakeLists.txt b/libs/widgets/CMakeLists.txt
+index 85c827feca..3179e69a93 100644
+--- a/libs/widgets/CMakeLists.txt
++++ b/libs/widgets/CMakeLists.txt
+@@ -107,7 +107,7 @@ target_link_libraries(kritawidgets
+     KF5::Completion
+ )
+ 
+-if(X11_FOUND)
++if(Qt5_X11Extras_FOUND)
+     target_link_libraries(kritawidgets Qt5::X11Extras ${X11_LIBRARIES})
+ endif()
+ 

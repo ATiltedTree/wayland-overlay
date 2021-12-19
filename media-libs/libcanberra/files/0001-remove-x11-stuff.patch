@@ -1,0 +1,210 @@
+From 314cba67cfabaadaf436791ca4dfe39637bc9860 Mon Sep 17 00:00:00 2001
+From: Tilmann Meyer <me@atiltedtree.dev>
+Date: Sun, 21 Nov 2021 11:51:37 +0100
+Subject: [PATCH] remove x11 stuff
+
+---
+ configure.ac              |  4 +-
+ src/canberra-gtk-module.c | 93 ++-------------------------------------
+ src/canberra-gtk.c        | 32 +-------------
+ 3 files changed, 6 insertions(+), 123 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index f68602d..14c60ca 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -437,7 +437,7 @@ AC_ARG_ENABLE([gtk],
+ 
+ AM_CONDITIONAL([GCONF_SCHEMAS_INSTALL], [false])
+ if test "x${gtk}" != xno ; then
+-    PKG_CHECK_MODULES(GTK, [ gtk+-2.0 >= 2.20.0 gthread-2.0 glib-2.0 >= 2.32 gdk-2.0 x11 ],
++    PKG_CHECK_MODULES(GTK, [ gtk+-2.0 >= 2.20.0 gthread-2.0 glib-2.0 >= 2.32 gdk-2.0 ],
+         [
+             HAVE_GTK=1
+             AC_DEFINE([HAVE_GTK], 1, [Have GTK?])
+@@ -473,7 +473,7 @@ AC_ARG_ENABLE([gtk3],
+         [gtk3=auto])
+ 
+ if test "x${gtk3}" != xno ; then
+-    PKG_CHECK_MODULES(GTK3, [ gtk+-3.0 gthread-2.0 glib-2.0 >= 2.32 gdk-3.0 x11 ],
++    PKG_CHECK_MODULES(GTK3, [ gtk+-3.0 gthread-2.0 glib-2.0 >= 2.32 gdk-3.0 ],
+         [
+             HAVE_GTK3=1
+             AC_DEFINE([HAVE_GTK3], 1, [Have GTK3?])
+diff --git a/src/canberra-gtk-module.c b/src/canberra-gtk-module.c
+index 67791f0..19c0a32 100644
+--- a/src/canberra-gtk-module.c
++++ b/src/canberra-gtk-module.c
+@@ -25,8 +25,6 @@
+ #endif
+ 
+ #include <gtk/gtk.h>
+-#include <gdk/gdkx.h>
+-#include <X11/Xatom.h>
+ 
+ #include "canberra-gtk.h"
+ 
+@@ -300,100 +298,15 @@ static SoundEventData* filter_sound_event(SoundEventData *d) {
+ }
+ 
+ static gint window_get_desktop(GdkDisplay *d, GdkWindow *w) {
+-        Atom type_return;
+-        gint format_return;
+-        gulong nitems_return;
+-        gulong bytes_after_return;
+-        guchar *data = NULL;
+-        gint ret = -1;
+-
+-        if (XGetWindowProperty(GDK_DISPLAY_XDISPLAY(d), GDK_WINDOW_XID(w),
+-                               gdk_x11_get_xatom_by_name_for_display(d, "_NET_WM_DESKTOP"),
+-                               0, G_MAXLONG, False, XA_CARDINAL, &type_return,
+-                               &format_return, &nitems_return, &bytes_after_return,
+-                               &data) != Success)
+-                return -1;
+-
+-        if (type_return == XA_CARDINAL && format_return == 32 && data) {
+-                guint32 desktop = *(guint32*) data;
+-
+-                if (desktop != 0xFFFFFFFF)
+-                        ret = (gint) desktop;
+-        }
+-
+-        if (type_return != None && data != NULL)
+-                XFree(data);
+-
+-        return ret;
++        return 0;
+ }
+ 
+ static gint display_get_desktop(GdkDisplay *d) {
+-        Atom type_return;
+-        gint format_return;
+-        gulong nitems_return;
+-        gulong bytes_after_return;
+-        guchar *data = NULL;
+-        gint ret = -1;
+-
+-        if (XGetWindowProperty(GDK_DISPLAY_XDISPLAY(d), DefaultRootWindow(GDK_DISPLAY_XDISPLAY(d)),
+-                               gdk_x11_get_xatom_by_name_for_display(d, "_NET_CURRENT_DESKTOP"),
+-                               0, G_MAXLONG, False, XA_CARDINAL, &type_return,
+-                               &format_return, &nitems_return, &bytes_after_return,
+-                               &data) != Success)
+-                return -1;
+-
+-        if (type_return == XA_CARDINAL && format_return == 32 && data) {
+-
+-                guint32 desktop = *(guint32*) data;
+-
+-                if (desktop != 0xFFFFFFFF)
+-                        ret = (gint) desktop;
+-        }
+-
+-        if (type_return != None && data != NULL)
+-                XFree(data);
+-
+-        return ret;
++        return -1;
+ }
+ 
+ static gboolean window_is_xembed(GdkDisplay *d, GdkWindow *w) {
+-        Atom type_return;
+-        gint format_return;
+-        gulong nitems_return;
+-        gulong bytes_after_return;
+-        guchar *data = NULL;
+-        gboolean ret = FALSE;
+-        Atom xembed;
+-
+-        /* Gnome Panel applets are XEMBED windows. We need to make sure we
+-         * ignore them */
+-
+-        xembed = gdk_x11_get_xatom_by_name_for_display(d, "_XEMBED_INFO");
+-
+-        /* be robust against not existing XIDs (LP: #834403) */
+-        gdk_error_trap_push();
+-        if (XGetWindowProperty(GDK_DISPLAY_XDISPLAY(d), GDK_WINDOW_XID(w),
+-                               xembed,
+-                               0, 2, False, xembed, &type_return,
+-                               &format_return, &nitems_return, &bytes_after_return,
+-                               &data) != Success) {
+-                return FALSE;
+-        }
+-
+-#if GTK_CHECK_VERSION(3,0,0)
+-        gdk_error_trap_pop_ignored();
+-#else
+-        gdk_flush();
+-        gdk_error_trap_pop();
+-#endif
+-
+-        if (type_return == xembed && format_return == 32 && data)
+-                ret = TRUE;
+-
+-        if (type_return != None && data != NULL)
+-                XFree(data);
+-
+-        return ret;
++        return FALSE;
+ }
+ 
+ static void dispatch_sound_event(SoundEventData *d) {
+diff --git a/src/canberra-gtk.c b/src/canberra-gtk.c
+index 34446f5..81bc9b9 100644
+--- a/src/canberra-gtk.c
++++ b/src/canberra-gtk.c
+@@ -26,8 +26,6 @@
+ 
+ #include <gtk/gtk.h>
+ #include <gdk/gdk.h>
+-#include <gdk/gdkx.h>
+-#include <X11/Xatom.h>
+ 
+ #include "canberra.h"
+ #include "canberra-gtk.h"
+@@ -178,31 +176,7 @@ static GtkWindow* get_toplevel(GtkWidget *w) {
+ }
+ 
+ static gint window_get_desktop(GdkDisplay *d, GdkWindow *w) {
+-        Atom type_return;
+-        gint format_return;
+-        gulong nitems_return;
+-        gulong bytes_after_return;
+-        guchar *data = NULL;
+-        gint ret = -1;
+-
+-        if (XGetWindowProperty(GDK_DISPLAY_XDISPLAY(d), GDK_WINDOW_XID(w),
+-                               gdk_x11_get_xatom_by_name_for_display(d, "_NET_WM_DESKTOP"),
+-                               0, G_MAXLONG, False, XA_CARDINAL, &type_return,
+-                               &format_return, &nitems_return, &bytes_after_return,
+-                               &data) != Success)
+-                return -1;
+-
+-        if (type_return == XA_CARDINAL && format_return == 32 && data) {
+-                guint32 desktop = *(guint32*) data;
+-
+-                if (desktop != 0xFFFFFFFF)
+-                        ret = (gint) desktop;
+-        }
+-
+-        if (type_return != None && data != NULL)
+-                XFree(data);
+-
+-        return ret;
++        return 0;
+ }
+ 
+ /**
+@@ -258,10 +232,6 @@ int ca_gtk_proplist_set_for_widget(ca_proplist *p, GtkWidget *widget) {
+                 GdkDisplay *display = NULL;
+                 gint x = -1, y = -1, width = -1, height = -1, screen_width = -1, screen_height = -1;
+ 
+-                if ((dw = gtk_widget_get_window(GTK_WIDGET(w))))
+-                        if ((ret = ca_proplist_setf(p, CA_PROP_WINDOW_X11_XID, "%lu", (unsigned long) GDK_WINDOW_XID(dw))) < 0)
+-                                return ret;
+-
+                 if ((display = gtk_widget_get_display(GTK_WIDGET(w)))) {
+                         if ((t = gdk_display_get_name(display)))
+                                 if ((ret = ca_proplist_sets(p, CA_PROP_WINDOW_X11_DISPLAY, t)) < 0)
+-- 
+2.34.0
+

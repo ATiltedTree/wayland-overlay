@@ -1,0 +1,16 @@
+diff --git a/src/theme/qgtk3dialoghelpers.cpp b/src/theme/qgtk3dialoghelpers.cpp
+index a33d0d1..0a5ed7c 100644
+--- a/src/theme/qgtk3dialoghelpers.cpp
++++ b/src/theme/qgtk3dialoghelpers.cpp
+@@ -52,7 +52,11 @@
+ #undef signals
+ #include <gtk/gtk.h>
+ #include <gdk/gdk.h>
++
++#ifdef GDK_WINDOWING_X11
+ #include <gdk/gdkx.h>
++#endif
++
+ #include <pango/pango.h>
+ 
+ QT_BEGIN_NAMESPACE
