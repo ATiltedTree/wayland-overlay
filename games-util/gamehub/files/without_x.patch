@@ -1,0 +1,34 @@
+diff --git a/src/meson.build b/src/meson.build
+index 2acdeac..19b3558 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -256,8 +256,6 @@ manette = dependency('manette-0.2', required: false)
+ if manette.found()
+ 	add_global_arguments('-D', 'MANETTE', language: 'vala')
+ 	deps += manette
+-	deps += dependency('x11')
+-	deps += dependency('gdk-x11-3.0')
+ 	deps += dependency('xtst')
+ 	sources += 'utils/Gamepad.vala'
+ 	sources += 'ui/dialogs/SettingsDialog/pages/general/Controller.vala'
+diff --git a/src/utils/Gamepad.vala b/src/utils/Gamepad.vala
+index 95dd243..ffaef53 100644
+--- a/src/utils/Gamepad.vala
++++ b/src/utils/Gamepad.vala
+@@ -254,16 +254,5 @@ namespace GameHub.Utils.Gamepad
+ 	// hack, but works (on X11)
+ 	private static void emit_key_event(uint key_code, bool press)
+ 	{
+-		if(key_code == 0) return;
+-		foreach(var wnd in Gtk.Window.list_toplevels())
+-		{
+-			if(wnd.is_active)
+-			{
+-				unowned X.Display xdisplay = (wnd.screen.get_display() as Gdk.X11.Display).get_xdisplay();
+-				XTest.fake_key_event(xdisplay, xdisplay.keysym_to_keycode((ulong) key_code), press, X.CURRENT_TIME);
+-				Gamepad.ButtonPressed = true;
+-				break;
+-			}
+-		}
+ 	}
+ }

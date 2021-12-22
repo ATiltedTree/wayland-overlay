@@ -38,6 +38,10 @@ BDEPEND="
 
 S="${WORKDIR}/${MY_P}"
 
+PATCHES=(
+	"${FILESDIR}"/without_x.patch
+)
+
 src_prepare() {
 	default
 	vala_src_prepare
