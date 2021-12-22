@@ -1,3 +1,18 @@
+diff --git a/src/app.vala b/src/app.vala
+index 9bb6a90..e08d177 100644
+--- a/src/app.vala
++++ b/src/app.vala
+@@ -225,10 +225,6 @@ namespace GameHub
+ 
+ 		public static int main(string[] args)
+ 		{
+-			#if MANETTE
+-			X.init_threads();
+-			#endif
+-
+ 			var app = new Application();
+ 
+ 			Utils.Logger.init();
 diff --git a/src/meson.build b/src/meson.build
 index 2acdeac..c8b79f7 100644
 --- a/src/meson.build
