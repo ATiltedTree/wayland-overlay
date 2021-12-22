@@ -798,7 +798,7 @@ src_configure() {
 	mozconfig_use_enable wifi necko-wifi
 
 	mozconfig_use_with X x
- 	mozconfig_use_with wayland
+	mozconfig_use_with wayland
 
 	if use lto ; then
 		if use clang ; then
