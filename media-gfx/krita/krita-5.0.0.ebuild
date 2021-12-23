@@ -3,7 +3,6 @@
 
 EAPI=8
 
-KDE_ORG_CATEGORY="graphics"
 ECM_TEST="forceoptional"
 PYTHON_COMPAT=( python3_{8..10} )
 KFMIN=5.82.0
@@ -12,20 +11,16 @@ VIRTUALX_REQUIRED="test"
 inherit ecm kde.org python-single-r1
 
 if [[ ${KDE_BUILD_TYPE} = release ]]; then
-	MY_PV="v${PV/_beta/-beta}"
-	MY_P="${PN}-${MY_PV}"
-	SRC_URI="https://invent.kde.org/graphics/krita/-/archive/${MY_PV}/${MY_P}.tar.gz"
-	S="${WORKDIR}/${MY_P}"
+	SRC_URI="mirror://kde/stable/${PN}/${PV}/${P}.tar.xz"
+	KEYWORDS="~amd64 ~arm64 ~ppc64 ~x86"
 fi
-
-KEYWORDS=""
 
 DESCRIPTION="Free digital painting application. Digital Painting, Creative Freedom!"
 HOMEPAGE="https://apps.kde.org/krita/ https://krita.org/en/"
 
 LICENSE="GPL-3"
 SLOT="5"
-IUSE="X color-management fftw gif +gsl heif +jpeg openexr pdf qtmedia +raw vc"
+IUSE="X color-management fftw gif +gsl heif +jpeg +mypaint-brush-engine openexr pdf qtmedia +raw vc webp"
 REQUIRED_USE="${PYTHON_REQUIRED_USE}"
 
 # bug 630508
@@ -41,10 +36,9 @@ RDEPEND="${PYTHON_DEPS}
 	>=dev-qt/qtconcurrent-${QTMIN}:5
 	>=dev-qt/qtdbus-${QTMIN}:5
 	>=dev-qt/qtdeclarative-${QTMIN}:5
-	>=dev-qt/qtgui-${QTMIN}:5
+	>=dev-qt/qtgui-${QTMIN}:5=[-gles2-only]
 	>=dev-qt/qtnetwork-${QTMIN}:5
 	>=dev-qt/qtprintsupport-${QTMIN}:5
-	>=dev-qt/qtsql-${QTMIN}:5
 	>=dev-qt/qtsvg-${QTMIN}:5
 	>=dev-qt/qtwidgets-${QTMIN}:5
 	>=dev-qt/qtxml-${QTMIN}:5
@@ -66,23 +60,22 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/tiff:0
 	sys-libs/zlib
 	X? (
+		>=dev-qt/qtx11extras-${QTMIN}:5
 		x11-libs/libX11
 		x11-libs/libXi
-		>=dev-qt/qtx11extras-${QTMIN}:5
 	)
-	color-management? ( =media-libs/opencolorio-1* )
+	color-management? ( >=media-libs/opencolorio-2.0.0 )
 	fftw? ( sci-libs/fftw:3.0= )
 	gif? ( media-libs/giflib )
 	gsl? ( sci-libs/gsl:= )
 	jpeg? ( virtual/jpeg:0 )
-	heif? ( media-libs/libheif:= )
-	openexr? (
-		media-libs/ilmbase:=
-		<media-libs/openexr-3.0.0:0=
-	)
+	heif? ( >=media-libs/libheif-1.11:= )
+	mypaint-brush-engine? ( media-libs/libmypaint:= )
+	openexr? ( media-libs/openexr:= )
 	pdf? ( app-text/poppler[qt5] )
 	qtmedia? ( >=dev-qt/qtmultimedia-${QTMIN}:5 )
 	raw? ( media-libs/libraw:= )
+	webp? ( >=media-libs/libwebp-1.2.0:= )
 "
 DEPEND="${RDEPEND}
 	vc? ( >=dev-libs/vc-1.1.0 )
@@ -94,14 +87,14 @@ BDEPEND="
 "
 
 PATCHES=(
-	"${FILESDIR}/without_x.patch"
-	"${FILESDIR}/krita-4.3.1-tests-optional.patch"
+	"${FILESDIR}"/without_x.patch
+	"${FILESDIR}"/${PN}-4.3.1-tests-optional.patch
 )
 
-# pkg_setup() {
-# 	python-single-r1_pkg_setup
-# 	ecm_pkg_setup
-# }
+pkg_setup() {
+	python-single-r1_pkg_setup
+	ecm_pkg_setup
+}
 
 src_configure() {
 	# Prevent sandbox violation from FindPyQt5.py module
@@ -109,18 +102,22 @@ src_configure() {
 	addpredict /dev/dri
 
 	local mycmakeargs=(
+		-DENABLE_UPDATERS=OFF
+		-DFETCH_TRANSLATIONS=OFF
 		-DCMAKE_DISABLE_FIND_PACKAGE_KSeExpr=ON # not packaged
-		$(cmake_use_find_package color-management OCIO)
+		$(cmake_use_find_package color-management OpenColorIO)
 		$(cmake_use_find_package fftw FFTW3)
 		$(cmake_use_find_package gif GIF)
 		$(cmake_use_find_package gsl GSL)
 		$(cmake_use_find_package heif HEIF)
 		$(cmake_use_find_package jpeg JPEG)
+		$(cmake_use_find_package mypaint-brush-engine LibMyPaint)
 		$(cmake_use_find_package openexr OpenEXR)
 		$(cmake_use_find_package pdf Poppler)
 		$(cmake_use_find_package qtmedia Qt5Multimedia)
 		$(cmake_use_find_package raw LibRaw)
 		$(cmake_use_find_package vc Vc)
+		$(cmake_use_find_package webp WebP)
 		$(cmake_use_find_package X Qt5X11Extras)
 		$(cmake_use_find_package X X11)
 	)
