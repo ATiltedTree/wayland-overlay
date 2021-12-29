@@ -90,6 +90,8 @@ BDEPEND="
 PATCHES=(
 	"${FILESDIR}"/without_x.patch
 	"${FILESDIR}"/${PN}-4.3.1-tests-optional.patch
+	"${FILESDIR}"/${P}-clang.patch # bug 830225
+	"${FILESDIR}"/${P}-krita_jp2.desktop.patch # bug 829987
 )
 
 pkg_setup() {
