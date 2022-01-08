@@ -22,7 +22,7 @@ DEPEND="
 	=kde-frameworks/kcoreaddons-${PVCUT}*:5
 	=kde-frameworks/kcrash-${PVCUT}*:5
 	=kde-frameworks/kdbusaddons-${PVCUT}*:5
-	=kde-frameworks/kwindowsystem-${PVCUT}*:5
+	=kde-frameworks/kwindowsystem-${PVCUT}*:5[X?]
 	X? (
 		>=dev-qt/qtx11extras-${QTMIN}:5
 		x11-libs/libxcb
