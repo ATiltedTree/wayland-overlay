@@ -1,14 +1,14 @@
-# Copyright 1999-2021 Gentoo Authors
+# Copyright 1999-2022 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI="7"
 
-FIREFOX_PATCHSET="firefox-95-patches-02.tar.xz"
-WAYLAND_PATCHSET="95-r7"
+FIREFOX_PATCHSET="firefox-96-patches-01.tar.xz"
+WAYLAND_PATCHSET="96"
 
 LLVM_MAX_SLOT=13
 
-PYTHON_COMPAT=( python3_{7..10} )
+PYTHON_COMPAT=( python3_{8..10} )
 PYTHON_REQ_USE="ncurses,sqlite,ssl"
 
 WANT_AUTOCONF="2.1"
@@ -49,7 +49,7 @@ if [[ ${PV} == *_rc* ]] ; then
 fi
 
 PATCH_URIS=(
-	https://dev.gentoo.org/~{polynomial-c,whissi}/mozilla/patchsets/${FIREFOX_PATCHSET}
+	https://dev.gentoo.org/~{juippis,polynomial-c,whissi}/mozilla/patchsets/${FIREFOX_PATCHSET}
 	"https://github.com/ATiltedTree/firefox-wayland/archive/refs/tags/${WAYLAND_PATCHSET}.tar.gz -> firefox-wayland-${WAYLAND_PATCHSET}.tar.gz"
 )
 
@@ -119,7 +119,7 @@ BDEPEND="${PYTHON_DEPS}
 	x86? ( >=dev-lang/nasm-2.13 )"
 
 CDEPEND="
-	>=dev-libs/nss-3.72.1
+	>=dev-libs/nss-3.73
 	>=dev-libs/nspr-4.32
 	dev-libs/atk
 	dev-libs/expat
@@ -139,6 +139,7 @@ CDEPEND="
 	media-video/ffmpeg
 	X? (
 		x11-libs/libX11
+		x11-libs/libXtst
 		x11-libs/libxcb
 		x11-libs/libXcomposite
 		x11-libs/libXdamage
@@ -581,9 +582,6 @@ src_prepare() {
 	use lto && rm -v "${WORKDIR}"/firefox-patches/*-LTO-Only-enable-LTO-*.patch
 	eapply "${WORKDIR}/firefox-patches"
 	eapply "${WORKDIR}/firefox-wayland-${WAYLAND_PATCHSET}"
-
-	# Temporary fix to fatal pip check run, #828999
-	eapply "${FILESDIR}"/firefox-95-fix-fatal-pip-invocation.patch
 
 	# Allow user to apply any additional patches without modifing ebuild
 	eapply_user
