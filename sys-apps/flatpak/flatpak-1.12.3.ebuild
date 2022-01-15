@@ -1,4 +1,4 @@
-# Copyright 2020-2021 Gentoo Authors
+# Copyright 2020-2022 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
@@ -65,10 +65,6 @@ PDEPEND="
 	kde? ( kde-plasma/xdg-desktop-portal-kde )
 "
 
-PATCHES=(
-	"${FILESDIR}"/${PN}-1.12.2-pyparsing-3.0.2-compat.patch
-)
-
 python_check_deps() {
 	has_version -b "dev-python/pyparsing[${PYTHON_USEDEP}]"
 }
@@ -88,7 +84,7 @@ src_prepare() {
 src_configure() {
 	local myeconfargs=(
 		--enable-sandboxed-triggers
-		--disable-xauth
+		--enable-xauth
 		--localstatedir="${EPREFIX}"/var
 		--with-system-bubblewrap
 		--with-system-dbus-proxy
