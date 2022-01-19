@@ -1,0 +1,94 @@
+From 8cbffa0ac923de97eb5c086984241dfba93aeb67 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Wed, 15 Sep 2021 19:08:02 +0300
+Subject: [PATCH 100/147] winewayland.drv: Prepare for supporting windows with
+ Vulkan content.
+
+Introduce function to create a Wayland subsurface as the target surface
+for Vulkan rendering, similarly to how we deal with GL rendering.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland_surface.c | 39 ++++++++++++++++++++------
+ dlls/winewayland.drv/waylanddrv.h      |  1 +
+ 2 files changed, 31 insertions(+), 9 deletions(-)
+
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index ff58c4370e4..6571b30167e 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -803,12 +803,10 @@ static struct wayland_surface *wayland_surface_ref_glvk(struct wayland_surface *
+     return glvk;
+ }
+ 
+-/**********************************************************************
+- *          wayland_surface_create_gl
+- *
+- * Creates a GL subsurface for this wayland surface.
+- */
+-BOOL wayland_surface_create_or_ref_gl(struct wayland_surface *surface)
++enum WAYLAND_GLVK { WAYLAND_GLVK_GL, WAYLAND_GLVK_VK };
++
++static BOOL wayland_surface_create_or_ref_glvk(struct wayland_surface *surface,
++                                               enum WAYLAND_GLVK wayland_glvk)
+ {
+     struct wayland_surface *glvk;
+     RECT client_rect;
+@@ -822,9 +820,12 @@ BOOL wayland_surface_create_or_ref_gl(struct wayland_surface *surface)
+     if (!glvk)
+         goto err;
+ 
+-    glvk->wl_egl_window = wl_egl_window_create(glvk->wl_surface, 1, 1);
+-    if (!glvk->wl_egl_window)
+-        goto err;
++    if (wayland_glvk == WAYLAND_GLVK_GL)
++    {
++        glvk->wl_egl_window = wl_egl_window_create(glvk->wl_surface, 1, 1);
++        if (!glvk->wl_egl_window)
++            goto err;
++    }
+ 
+     EnterCriticalSection(&surface->crit);
+     surface->glvk = glvk;
+@@ -849,6 +850,26 @@ err:
+     return FALSE;
+ }
+ 
++/**********************************************************************
++ *          wayland_surface_create_gl
++ *
++ * Creates a GL subsurface for this wayland surface.
++ */
++BOOL wayland_surface_create_or_ref_gl(struct wayland_surface *surface)
++{
++    return wayland_surface_create_or_ref_glvk(surface, WAYLAND_GLVK_GL);
++}
++
++/**********************************************************************
++ *          wayland_surface_create_or_ref_vk
++ *
++ * Creates a VK subsurface for this wayland surface.
++ */
++BOOL wayland_surface_create_or_ref_vk(struct wayland_surface *surface)
++{
++    return wayland_surface_create_or_ref_glvk(surface, WAYLAND_GLVK_VK);
++}
++
+ /**********************************************************************
+  *          wayland_surface_unref_glvk
+  *
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index c1b5923872d..220712f687b 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -359,6 +359,7 @@ void wayland_surface_reconfigure_size(struct wayland_surface *surface,
+                                       int width, int height);
+ void wayland_surface_reconfigure_apply(struct wayland_surface *surface);
+ BOOL wayland_surface_create_or_ref_gl(struct wayland_surface *surface);
++BOOL wayland_surface_create_or_ref_vk(struct wayland_surface *surface);
+ void wayland_surface_unref_glvk(struct wayland_surface *surface);
+ void wayland_surface_reconfigure_glvk(struct wayland_surface *surface, int x, int y,
+                                       int width, int height);
+-- 
+2.34.1
+

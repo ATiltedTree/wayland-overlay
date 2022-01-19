@@ -1,0 +1,165 @@
+From ac45ddd87a2726a766610429cc2f5aae14c462b7 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Mon, 13 Sep 2021 16:59:19 +0300
+Subject: [PATCH 067/147] winewayland.drv: Add skeleton GDI driver.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/Makefile.in       |  1 +
+ dlls/winewayland.drv/gdi.c             | 84 ++++++++++++++++++++++++++
+ dlls/winewayland.drv/waylanddrv.h      | 11 ++++
+ dlls/winewayland.drv/waylanddrv_main.c |  7 ++-
+ 4 files changed, 102 insertions(+), 1 deletion(-)
+ create mode 100644 dlls/winewayland.drv/gdi.c
+
+diff --git a/dlls/winewayland.drv/Makefile.in b/dlls/winewayland.drv/Makefile.in
+index 5943ba994c3..e97409b90f4 100644
+--- a/dlls/winewayland.drv/Makefile.in
++++ b/dlls/winewayland.drv/Makefile.in
+@@ -11,6 +11,7 @@ EXTRADLLFLAGS = -mcygwin
+ 
+ C_SRCS = \
+ 	display.c \
++	gdi.c \
+ 	wayland.c \
+ 	wayland_output.c \
+ 	waylanddrv_main.c \
+diff --git a/dlls/winewayland.drv/gdi.c b/dlls/winewayland.drv/gdi.c
+new file mode 100644
+index 00000000000..321884b437d
+--- /dev/null
++++ b/dlls/winewayland.drv/gdi.c
+@@ -0,0 +1,84 @@
++/*
++ * Wayland gdi functions
++ *
++ * Copyright 2020 Alexandros Frantzis for Collabora Ltd
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#include "config.h"
++
++#include "waylanddrv.h"
++
++#include "wine/heap.h"
++
++typedef struct
++{
++    struct gdi_physdev dev;
++} WAYLAND_PDEVICE;
++
++static inline WAYLAND_PDEVICE *get_wayland_dev(PHYSDEV dev)
++{
++    return (WAYLAND_PDEVICE *)dev;
++}
++
++static WAYLAND_PDEVICE *create_wayland_physdev(void)
++{
++    WAYLAND_PDEVICE *physDev;
++
++    physDev = heap_alloc_zero(sizeof(*physDev));
++
++    return physDev;
++}
++
++/**********************************************************************
++ *           WAYLAND_CreateDC
++ */
++BOOL CDECL WAYLAND_CreateDC(PHYSDEV *pdev, LPCWSTR device,
++                            LPCWSTR output, const DEVMODEW* initData)
++{
++    WAYLAND_PDEVICE *physDev = create_wayland_physdev();
++
++    if (!physDev) return FALSE;
++
++    push_dc_driver(pdev, &physDev->dev, &waylanddrv_funcs.dc_funcs);
++
++    return TRUE;
++}
++
++/**********************************************************************
++ *           WAYLAND_CreateCompatibleDC
++ */
++BOOL CDECL WAYLAND_CreateCompatibleDC(PHYSDEV orig, PHYSDEV *pdev)
++{
++    WAYLAND_PDEVICE *physDev = create_wayland_physdev();
++
++    if (!physDev) return FALSE;
++
++    push_dc_driver(pdev, &physDev->dev, &waylanddrv_funcs.dc_funcs);
++
++    return TRUE;
++}
++
++/**********************************************************************
++ *           WAYLAND_DeleteDC
++ */
++BOOL CDECL WAYLAND_DeleteDC(PHYSDEV dev)
++{
++    WAYLAND_PDEVICE *physDev = get_wayland_dev(dev);
++
++    HeapFree(GetProcessHeap(), 0, physDev);
++    return TRUE;
++}
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index cff1e2cad21..ed2d3296ef4 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -41,6 +41,7 @@
+ #include "wine/gdi_driver.h"
+ 
+ extern struct wl_display *process_wl_display;
++extern const struct user_driver_funcs waylanddrv_funcs;
+ 
+ /**********************************************************************
+   *          Internal messages and data
+@@ -454,4 +455,14 @@ extern BOOL CDECL WAYLAND_WindowPosChanging(HWND hwnd, HWND insert_after, UINT s
+                                             const RECT *window_rect, const RECT *client_rect,
+                                             RECT *visible_rect, struct window_surface **surface) DECLSPEC_HIDDEN;
+ 
++/**********************************************************************
++ *          GDI driver functions
++ */
++
++extern BOOL CDECL WAYLAND_CreateDC(PHYSDEV *pdev, LPCWSTR device,
++                                   LPCWSTR output, const DEVMODEW* initData) DECLSPEC_HIDDEN;
++extern BOOL CDECL WAYLAND_CreateCompatibleDC(PHYSDEV orig, PHYSDEV *pdev) DECLSPEC_HIDDEN;
++extern BOOL CDECL WAYLAND_CreateCompatibleDC(PHYSDEV orig, PHYSDEV *pdev) DECLSPEC_HIDDEN;
++extern BOOL CDECL WAYLAND_DeleteDC(PHYSDEV dev) DECLSPEC_HIDDEN;
++
+ #endif /* __WINE_WAYLANDDRV_H */
+diff --git a/dlls/winewayland.drv/waylanddrv_main.c b/dlls/winewayland.drv/waylanddrv_main.c
+index 1bba4b58f23..28902e02458 100644
+--- a/dlls/winewayland.drv/waylanddrv_main.c
++++ b/dlls/winewayland.drv/waylanddrv_main.c
+@@ -119,8 +119,13 @@ static void CDECL WAYLAND_ThreadDetach(void)
+     }
+ }
+ 
+-static const struct user_driver_funcs waylanddrv_funcs =
++const struct user_driver_funcs waylanddrv_funcs =
+ {
++    .dc_funcs.pCreateDC = WAYLAND_CreateDC,
++    .dc_funcs.pCreateCompatibleDC = WAYLAND_CreateCompatibleDC,
++    .dc_funcs.pDeleteDC = WAYLAND_DeleteDC,
++    .dc_funcs.priority = GDI_PRIORITY_GRAPHICS_DRV,
++
+     .pChangeDisplaySettingsEx = WAYLAND_ChangeDisplaySettingsEx,
+     .pCreateWindow = WAYLAND_CreateWindow,
+     .pDestroyWindow = WAYLAND_DestroyWindow,
+-- 
+2.34.1
+

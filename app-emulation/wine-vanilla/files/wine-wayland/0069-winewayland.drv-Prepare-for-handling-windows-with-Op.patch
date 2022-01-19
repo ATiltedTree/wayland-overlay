@@ -1,0 +1,517 @@
+From cdd77d5178e853f6b256c7efbd0f6ba3bc7f7174 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Mon, 13 Sep 2021 17:48:15 +0300
+Subject: [PATCH 069/147] winewayland.drv: Prepare for handling windows with
+ OpenGL/VK content.
+
+Use a Wayland subsurface as the target surface for OpenGL/VK rendering
+and support reconfiguring it appropriately. The toplevel Wayland surface
+is used for all non-client rendering.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ configure                              |  82 +++++++++
+ configure.ac                           |   4 +
+ dlls/winewayland.drv/Makefile.in       |   4 +-
+ dlls/winewayland.drv/wayland_surface.c | 233 +++++++++++++++++++++++--
+ dlls/winewayland.drv/waylanddrv.h      |   9 +
+ dlls/winewayland.drv/window.c          |  11 +-
+ include/config.h.in                    |   3 +
+ 7 files changed, 328 insertions(+), 18 deletions(-)
+
+diff --git a/configure b/configure
+index 71f11450a1e..bbe33738bb5 100755
+--- a/configure
++++ b/configure
+@@ -705,6 +705,8 @@ DBUS_CFLAGS
+ INOTIFY_LIBS
+ INOTIFY_CFLAGS
+ PCAP_LIBS
++WAYLAND_EGL_LIBS
++WAYLAND_EGL_CFLAGS
+ XKBCOMMON_LIBS
+ XKBCOMMON_CFLAGS
+ WAYLAND_SCANNER
+@@ -1998,6 +2000,8 @@ WAYLAND_PROTOCOLS_CFLAGS
+ WAYLAND_PROTOCOLS_LIBS
+ XKBCOMMON_CFLAGS
+ XKBCOMMON_LIBS
++WAYLAND_EGL_CFLAGS
++WAYLAND_EGL_LIBS
+ INOTIFY_CFLAGS
+ INOTIFY_LIBS
+ DBUS_CFLAGS
+@@ -2807,6 +2811,10 @@ Some influential environment variables:
+               C compiler flags for xkbcommon, overriding pkg-config
+   XKBCOMMON_LIBS
+               Linker flags for xkbcommon, overriding pkg-config
++  WAYLAND_EGL_CFLAGS
++              C compiler flags for wayland-egl, overriding pkg-config
++  WAYLAND_EGL_LIBS
++              Linker flags for wayland-egl, overriding pkg-config
+   INOTIFY_CFLAGS
+               C compiler flags for libinotify, overriding pkg-config
+   INOTIFY_LIBS
+@@ -16011,6 +16019,78 @@ else $as_nop
+   XKBCOMMON_LIBS=""
+ fi
+ 
++CPPFLAGS=$ac_save_CPPFLAGS
++
++    if ${WAYLAND_EGL_CFLAGS:+false} :
++then :
++  if test ${PKG_CONFIG+y}
++then :
++  WAYLAND_EGL_CFLAGS=`$PKG_CONFIG --cflags wayland-egl 2>/dev/null`
++fi
++fi
++
++if ${WAYLAND_EGL_LIBS:+false} :
++then :
++  if test ${PKG_CONFIG+y}
++then :
++  WAYLAND_EGL_LIBS=`$PKG_CONFIG --libs wayland-egl 2>/dev/null`
++fi
++fi
++
++
++printf "%s\n" "$as_me:${as_lineno-$LINENO}: wayland-egl cflags: $WAYLAND_EGL_CFLAGS" >&5
++printf "%s\n" "$as_me:${as_lineno-$LINENO}: wayland-egl libs: $WAYLAND_EGL_LIBS" >&5
++ac_save_CPPFLAGS=$CPPFLAGS
++CPPFLAGS="$CPPFLAGS $WAYLAND_EGL_CFLAGS"
++ac_fn_c_check_header_compile "$LINENO" "wayland-egl.h" "ac_cv_header_wayland_egl_h" "$ac_includes_default"
++if test "x$ac_cv_header_wayland_egl_h" = xyes
++then :
++  printf "%s\n" "#define HAVE_WAYLAND_EGL_H 1" >>confdefs.h
++
++fi
++
++         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for wl_egl_window_create in -lwayland-egl" >&5
++printf %s "checking for wl_egl_window_create in -lwayland-egl... " >&6; }
++if test ${ac_cv_lib_wayland_egl_wl_egl_window_create+y}
++then :
++  printf %s "(cached) " >&6
++else $as_nop
++  ac_check_lib_save_LIBS=$LIBS
++LIBS="-lwayland-egl $WAYLAND_EGL_LIBS $LIBS"
++cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++/* Override any GCC internal prototype to avoid an error.
++   Use char because int might match the return type of a GCC
++   builtin and then its argument prototype would still apply.  */
++char wl_egl_window_create ();
++int
++main (void)
++{
++return wl_egl_window_create ();
++  ;
++  return 0;
++}
++_ACEOF
++if ac_fn_c_try_link "$LINENO"
++then :
++  ac_cv_lib_wayland_egl_wl_egl_window_create=yes
++else $as_nop
++  ac_cv_lib_wayland_egl_wl_egl_window_create=no
++fi
++rm -f core conftest.err conftest.$ac_objext conftest.beam \
++    conftest$ac_exeext conftest.$ac_ext
++LIBS=$ac_check_lib_save_LIBS
++fi
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_wayland_egl_wl_egl_window_create" >&5
++printf "%s\n" "$ac_cv_lib_wayland_egl_wl_egl_window_create" >&6; }
++if test "x$ac_cv_lib_wayland_egl_wl_egl_window_create" = xyes
++then :
++  :
++else $as_nop
++  WAYLAND_EGL_LIBS=""
++fi
++
+ CPPFLAGS=$ac_save_CPPFLAGS
+ 
+ fi
+@@ -24007,6 +24087,8 @@ WAYLAND_PROTOCOLS_DATADIR = $WAYLAND_PROTOCOLS_DATADIR
+ WAYLAND_SCANNER = $WAYLAND_SCANNER
+ XKBCOMMON_CFLAGS = $XKBCOMMON_CFLAGS
+ XKBCOMMON_LIBS = $XKBCOMMON_LIBS
++WAYLAND_EGL_CFLAGS = $WAYLAND_EGL_CFLAGS
++WAYLAND_EGL_LIBS = $WAYLAND_EGL_LIBS
+ PCAP_LIBS = $PCAP_LIBS
+ INOTIFY_CFLAGS = $INOTIFY_CFLAGS
+ INOTIFY_LIBS = $INOTIFY_LIBS
+diff --git a/configure.ac b/configure.ac
+index cabfbb27ba5..721e95c796a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1338,6 +1338,10 @@ then
+     WINE_PACKAGE_FLAGS(XKBCOMMON,[xkbcommon],,,,
+         [AC_CHECK_HEADERS([xkbcommon/xkbcommon.h])
+          AC_CHECK_LIB(xkbcommon,xkb_context_new,[:],[XKBCOMMON_LIBS=""],[$XKBCOMMON_LIBS])])
++    WINE_PACKAGE_FLAGS(WAYLAND_EGL,[wayland-egl],,,,
++        [AC_CHECK_HEADERS([wayland-egl.h])
++         AC_CHECK_LIB(wayland-egl,wl_egl_window_create,[:],
++                      [WAYLAND_EGL_LIBS=""],[$WAYLAND_EGL_LIBS])])
+ fi
+ WINE_NOTICE_WITH(wayland, [test -z "$WAYLAND_CLIENT_LIBS" ||
+                            test -z "$WAYLAND_PROTOCOLS_DATADIR" ||
+diff --git a/dlls/winewayland.drv/Makefile.in b/dlls/winewayland.drv/Makefile.in
+index e97409b90f4..dfcccaa0faa 100644
+--- a/dlls/winewayland.drv/Makefile.in
++++ b/dlls/winewayland.drv/Makefile.in
+@@ -1,7 +1,7 @@
+ MODULE    = winewayland.drv
+ IMPORTS   = advapi32 gdi32 user32 win32u
+-EXTRAINCL = $(WAYLAND_CLIENT_CFLAGS) $(XKBCOMMON_CFLAGS)
+-EXTRALIBS = $(WAYLAND_CLIENT_LIBS) $(XKBCOMMON_LIBS)
++EXTRAINCL = $(WAYLAND_CLIENT_CFLAGS) $(WAYLAND_EGL_CFLAGS) $(XKBCOMMON_CFLAGS)
++EXTRALIBS = $(WAYLAND_CLIENT_LIBS) $(WAYLAND_EGL_LIBS) $(XKBCOMMON_LIBS)
+ CFLAGS = -std=c11 -Wno-declaration-after-statement
+ EXTRACFLAGS = -std=c11 -Wno-declaration-after-statement
+ CPPFLAGS = -std=c11 -Wno-declaration-after-statement
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index c138bd7100c..084ef6834dc 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -435,6 +435,9 @@ void wayland_surface_reconfigure_position(struct wayland_surface *surface,
+  *
+  * The coordinates and sizes should be given in wine's coordinate space.
+  *
++ * Note that this doesn't configure any associated GL/VK subsurface,
++ * wayland_surface_reconfigure_glvk() needs to be called separately.
++ *
+  * This function sets up but doesn't actually apply any new configuration.
+  * The wayland_surface_reconfigure_apply() needs to be called for changes
+  * to take effect.
+@@ -510,21 +513,6 @@ void wayland_surface_reconfigure_size(struct wayland_surface *surface,
+     }
+ }
+ 
+-/**********************************************************************
+- *          wayland_surface_reconfigure_apply
+- *
+- * Applies the configuration set by previous calls to the
+- * wayland_surface_reconfigure{_glvk}() functions.
+- */
+-void wayland_surface_reconfigure_apply(struct wayland_surface *surface)
+-{
+-    wl_surface_commit(surface->wl_surface);
+-
+-    /* Commit the parent so any subsurface repositioning takes effect. */
+-    if (surface->parent)
+-        wl_surface_commit(surface->parent->wl_surface);
+-}
+-
+ /**********************************************************************
+  *          wayland_surface_configure_is_compatible
+  *
+@@ -689,6 +677,12 @@ void wayland_surface_destroy(struct wayland_surface *surface)
+         heap_free(ref);
+     }
+ 
++    if (surface->wl_egl_window)
++    {
++        wl_egl_window_destroy(surface->wl_egl_window);
++        surface->wl_egl_window = NULL;
++    }
++
+     if (surface->wp_viewport)
+     {
+         wp_viewport_destroy(surface->wp_viewport);
+@@ -741,6 +735,211 @@ void wayland_surface_destroy(struct wayland_surface *surface)
+     heap_free(surface);
+ }
+ 
++static struct wayland_surface *wayland_surface_create_glvk_common(struct wayland_surface *surface)
++{
++    struct wayland_surface *glvk;
++
++    TRACE("surface=%p hwnd=%p\n", surface, surface->hwnd);
++
++    glvk = wayland_surface_create_plain(surface->wayland);
++    if (!glvk)
++        goto err;
++
++    glvk->parent = wayland_surface_ref(surface);
++
++    /* Remove from toplevel_list (added as a plain surface) and add to parent
++     * child list. */
++    wl_list_remove(&glvk->link);
++    EnterCriticalSection(&glvk->parent->crit);
++    wl_list_insert(&glvk->parent->child_list, &glvk->link);
++    LeaveCriticalSection(&glvk->parent->crit);
++
++    glvk->wl_subsurface =
++        wl_subcompositor_get_subsurface(glvk->wayland->wl_subcompositor,
++                                        glvk->wl_surface,
++                                        surface->wl_surface);
++    if (!glvk->wl_subsurface)
++        goto err;
++    wl_subsurface_set_desync(glvk->wl_subsurface);
++    /* Place the glvk subsurface just above the parent surface, so that it
++     * doesn't end up obscuring any other subsurfaces. */
++    wl_subsurface_place_above(glvk->wl_subsurface, surface->wl_surface);
++
++    glvk->hwnd = surface->hwnd;
++    glvk->main_output = surface->main_output;
++    glvk->wine_output = surface->wine_output;
++    wl_surface_set_buffer_scale(glvk->wl_surface, wayland_surface_get_buffer_scale(surface));
++    glvk->role = WAYLAND_SURFACE_ROLE_SUBSURFACE;
++
++    return glvk;
++
++err:
++    if (glvk)
++        wayland_surface_destroy(glvk);
++
++    return NULL;
++}
++
++static struct wayland_surface *wayland_surface_ref_glvk(struct wayland_surface *surface)
++{
++    struct wayland_surface *glvk = NULL;
++    EnterCriticalSection(&surface->crit);
++    if (surface->glvk)
++        glvk = wayland_surface_ref(surface->glvk);
++    LeaveCriticalSection(&surface->crit);
++    return glvk;
++}
++
++/**********************************************************************
++ *          wayland_surface_create_gl
++ *
++ * Creates a GL subsurface for this wayland surface.
++ */
++BOOL wayland_surface_create_or_ref_gl(struct wayland_surface *surface)
++{
++    struct wayland_surface *glvk;
++    RECT client_rect;
++
++    TRACE("surface=%p hwnd=%p\n", surface, surface->hwnd);
++
++    if (wayland_surface_ref_glvk(surface))
++        return TRUE;
++
++    glvk = wayland_surface_create_glvk_common(surface);
++    if (!glvk)
++        goto err;
++
++    glvk->wl_egl_window = wl_egl_window_create(glvk->wl_surface, 1, 1);
++    if (!glvk->wl_egl_window)
++        goto err;
++
++    EnterCriticalSection(&surface->crit);
++    surface->glvk = glvk;
++    LeaveCriticalSection(&surface->crit);
++
++    /* Set initial position in the client area. */
++    wayland_get_client_rect_in_win_coords(surface->hwnd, &client_rect);
++
++    wayland_surface_reconfigure_glvk(surface,
++                                     client_rect.left, client_rect.top,
++                                     client_rect.right - client_rect.left,
++                                     client_rect.bottom - client_rect.top);
++
++    wayland_surface_reconfigure_apply(surface);
++
++    return TRUE;
++
++err:
++    if (glvk)
++        wayland_surface_destroy(glvk);
++
++    return FALSE;
++}
++
++/**********************************************************************
++ *          wayland_surface_unref_glvk
++ *
++ * Unreferences the associated GL/VK subsurface for this wayland surface.
++ */
++void wayland_surface_unref_glvk(struct wayland_surface *surface)
++{
++    struct wayland_surface *glvk_to_destroy = NULL;
++    LONG ref = -12345;
++
++    EnterCriticalSection(&surface->crit);
++    if (surface->glvk && (ref = InterlockedDecrement(&surface->glvk->ref)) == 0)
++    {
++        glvk_to_destroy = surface->glvk;
++        surface->glvk = NULL;
++    }
++    TRACE("surface=%p glvk=%p ref=%d->%d\n",
++          surface, glvk_to_destroy ? glvk_to_destroy : surface->glvk, ref + 1, ref);
++    LeaveCriticalSection(&surface->crit);
++
++    if (glvk_to_destroy)
++        wayland_surface_destroy(glvk_to_destroy);
++}
++
++/**********************************************************************
++ *          wayland_surface_reconfigure_glvk
++ *
++ * Configures the position and size of the GL/VK subsurface associated with
++ * a wayland surface.
++ *
++ * The coordinates and sizes should be given in wine's coordinate space.
++ *
++ * This function sets up but doesn't actually apply any new configuration.
++ * The wayland_surface_reconfigure_apply() needs to be called for changes
++ * to take effect.
++ */
++void wayland_surface_reconfigure_glvk(struct wayland_surface *surface,
++                                      int wine_x, int wine_y,
++                                      int wine_width, int wine_height)
++{
++    int x, y, width, height;
++    struct wayland_surface *glvk = wayland_surface_ref_glvk(surface);
++
++    if (!glvk)
++        return;
++
++    wayland_surface_coords_rounded_from_wine(surface, wine_x, wine_y, &x, &y);
++    wayland_surface_coords_rounded_from_wine(surface, wine_width, wine_height,
++                                             &width, &height);
++
++    TRACE("surface=%p hwnd=%p %d,%d+%dx%d %d,%d+%dx%d\n",
++          surface, surface->hwnd,
++          wine_x, wine_y, wine_width, wine_height,
++          x, y, width, height);
++
++    glvk->offset_x = wine_x;
++    glvk->offset_y = wine_y;
++
++    wl_subsurface_set_position(glvk->wl_subsurface, x, y);
++
++    /* The EGL window size needs to be in wine coords since this affects
++     * the effective EGL buffer size. */
++    if (glvk->wl_egl_window)
++        wl_egl_window_resize(glvk->wl_egl_window, wine_width, wine_height, 0, 0);
++
++    /* Use a viewport, if supported, to ensure GL surfaces remain inside their
++     * parent's boundaries when resizing and also to handle display mode
++     * changes. If the size is invalid use a 1x1 destination (instead of
++     * unsetting with -1x-1) since many apps don't respect a GL/VK 0x0 size
++     * which can happen, e.g., when an app is minimized. */
++    if (glvk->wp_viewport)
++    {
++        if (width != 0 && height != 0)
++            wp_viewport_set_destination(glvk->wp_viewport, width, height);
++        else
++            wp_viewport_set_destination(glvk->wp_viewport, 1, 1);
++    }
++
++    wayland_surface_unref_glvk(surface);
++}
++
++/**********************************************************************
++ *          wayland_surface_reconfigure_apply
++ *
++ * Applies the configuration set by previous calls to the
++ * wayland_surface_reconfigure{_glvk}() functions.
++ */
++void wayland_surface_reconfigure_apply(struct wayland_surface *surface)
++{
++    struct wayland_surface *glvk = wayland_surface_ref_glvk(surface);
++
++    if (glvk)
++    {
++        wl_surface_commit(glvk->wl_surface);
++        wayland_surface_unref_glvk(surface);
++    }
++
++    wl_surface_commit(surface->wl_surface);
++
++    /* Commit the parent so any subsurface repositioning takes effect. */
++    if (surface->parent)
++        wl_surface_commit(surface->parent->wl_surface);
++}
++
+ /**********************************************************************
+  *          wayland_surface_unmap
+  *
+@@ -785,6 +984,10 @@ void wayland_surface_coords_to_screen(struct wayland_surface *surface,
+ 
+     GetWindowRect(surface->hwnd, &window_rect);
+ 
++    /* Some wayland surfaces are offset relative to their window rect,
++     * e.g., GL subsurfaces. */
++    OffsetRect(&window_rect, surface->offset_x, surface->offset_y);
++
+     *screen_x = wine_x + window_rect.left;
+     *screen_y = wine_y + window_rect.top;
+ 
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index 373d68894b7..3a97897a6a5 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -27,6 +27,7 @@
+ 
+ #include <stdarg.h>
+ #include <wayland-client.h>
++#include <wayland-egl.h>
+ #include <xkbcommon/xkbcommon.h>
+ #include <xkbcommon/xkbcommon-compose.h>
+ #include "viewporter-client-protocol.h"
+@@ -197,7 +198,11 @@ struct wayland_surface
+     struct xdg_surface *xdg_surface;
+     struct xdg_toplevel *xdg_toplevel;
+     struct wp_viewport *wp_viewport;
++    struct wl_egl_window *wl_egl_window;
+     struct wayland_surface *parent;
++    struct wayland_surface *glvk;
++    /* The offset of this surface relative to its owning win32 window */
++    int offset_x, offset_y;
+     HWND hwnd;
+     CRITICAL_SECTION crit;
+     struct wayland_surface_configure pending;
+@@ -336,6 +341,10 @@ void wayland_surface_reconfigure_geometry(struct wayland_surface *surface,
+ void wayland_surface_reconfigure_size(struct wayland_surface *surface,
+                                       int width, int height);
+ void wayland_surface_reconfigure_apply(struct wayland_surface *surface);
++BOOL wayland_surface_create_or_ref_gl(struct wayland_surface *surface);
++void wayland_surface_unref_glvk(struct wayland_surface *surface);
++void wayland_surface_reconfigure_glvk(struct wayland_surface *surface, int x, int y,
++                                      int width, int height);
+ void wayland_surface_unmap(struct wayland_surface *surface);
+ void wayland_surface_ack_pending_configure(struct wayland_surface *surface);
+ void wayland_surface_coords_to_screen(struct wayland_surface *surface,
+diff --git a/dlls/winewayland.drv/window.c b/dlls/winewayland.drv/window.c
+index 15f7776e5da..cadcfcbc531 100644
+--- a/dlls/winewayland.drv/window.c
++++ b/dlls/winewayland.drv/window.c
+@@ -817,7 +817,16 @@ static void wayland_win_data_update_wayland_surface_state(struct wayland_win_dat
+                                              compat.bottom - compat.top);
+     }
+ 
+-    wayland_surface_reconfigure_apply(wsurface);
++    /* The GL/VK subsurface (if any), is positioned over the client area of the
++     * window. The position of the GL/VK subsurface is relative to the window
++     * top-left. */
++    wayland_surface_reconfigure_glvk(wsurface,
++                                     data->client_rect.left - data->window_rect.left,
++                                     data->client_rect.top - data->window_rect.top,
++                                     data->client_rect.right - data->client_rect.left,
++                                     data->client_rect.bottom - data->client_rect.top);
++
++    wayland_surface_reconfigure_apply(data->wayland_surface);
+ 
+     if (wsurface->xdg_toplevel || wsurface->wl_subsurface)
+         wsurface->drawing_allowed = TRUE;
+diff --git a/include/config.h.in b/include/config.h.in
+index ba4cd3620a9..347b1c2613d 100644
+--- a/include/config.h.in
++++ b/include/config.h.in
+@@ -700,6 +700,9 @@
+ /* Define to 1 if you have the <wayland-client.h> header file. */
+ #undef HAVE_WAYLAND_CLIENT_H
+ 
++/* Define to 1 if you have the <wayland-egl.h> header file. */
++#undef HAVE_WAYLAND_EGL_H
++
+ /* Define to 1 if you have the <X11/extensions/shape.h> header file. */
+ #undef HAVE_X11_EXTENSIONS_SHAPE_H
+ 
+-- 
+2.34.1
+

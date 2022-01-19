@@ -1,0 +1,43 @@
+From 36717380b08f8f81b01464e9398e4a84d70836c4 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Mon, 20 Sep 2021 16:35:45 +0300
+Subject: [PATCH 118/147] winewayland.drv: Implement wine_get_native_surface.
+
+The VkSurfaceKHR we return in wayland_vkCreateWin32SurfaceKHR *is* the
+native VkSurfaceKHR, so the implementation is trivial.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/vulkan.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/dlls/winewayland.drv/vulkan.c b/dlls/winewayland.drv/vulkan.c
+index 5650dbbd6cb..aa998fe6d4c 100644
+--- a/dlls/winewayland.drv/vulkan.c
++++ b/dlls/winewayland.drv/vulkan.c
+@@ -810,6 +810,14 @@ static VkResult wayland_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR
+     return res;
+ }
+ 
++/* The VkSurfaceKHR we return in wayland_vkCreateWin32SurfaceKHR *is* the
++ * native surface. */
++static VkSurfaceKHR wayland_wine_get_native_surface(VkSurfaceKHR surface)
++{
++    TRACE("0x%s\n", wine_dbgstr_longlong(surface));
++    return surface;
++}
++
+ static BOOL WINAPI wine_vk_init(INIT_ONCE *once, void *param, void **context)
+ {
+     if (!(vulkan_handle = dlopen(SONAME_LIBVULKAN, RTLD_NOW)))
+@@ -873,6 +881,7 @@ static const struct vulkan_funcs vulkan_funcs =
+     .p_vkGetPhysicalDeviceWin32PresentationSupportKHR = wayland_vkGetPhysicalDeviceWin32PresentationSupportKHR,
+     .p_vkGetSwapchainImagesKHR = wayland_vkGetSwapchainImagesKHR,
+     .p_vkQueuePresentKHR = wayland_vkQueuePresentKHR,
++    .p_wine_get_native_surface = wayland_wine_get_native_surface,
+ };
+ 
+ const struct vulkan_funcs *wayland_get_vulkan_driver(UINT version)
+-- 
+2.34.1
+

@@ -1,0 +1,108 @@
+From 39023efdf16380c719caec7166dbe0e562e705cf Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Fri, 3 Sep 2021 16:37:15 +0300
+Subject: [PATCH 032/147] winewayland.drv: Add functions to transform Wayland
+ to Wine coordinates.
+
+The functions are currently trivial, in the sense that they apply the
+identity transformation. They will be enhanced as needed in upcoming
+commits to handle differences in the coordinate spaces, introduced, e.g,
+by the use of scaling.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland_surface.c | 40 ++++++++++++++++++++++++++
+ dlls/winewayland.drv/waylanddrv.h      |  6 ++++
+ 2 files changed, 46 insertions(+)
+
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index 8e04f824bcb..cc107c8e830 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -24,6 +24,8 @@
+ #include "wine/debug.h"
+ #include "wine/heap.h"
+ 
++#include "winuser.h"
++
+ WINE_DEFAULT_DEBUG_CHANNEL(waylanddrv);
+ 
+ static void handle_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface,
+@@ -450,6 +452,31 @@ void wayland_surface_unmap(struct wayland_surface *surface)
+     LeaveCriticalSection(&surface->crit);
+ }
+ 
++/**********************************************************************
++ *          wayland_surface_coords_to_screen
++ *
++ * Converts the surface-local coordinates to Windows screen coordinates.
++ */
++void wayland_surface_coords_to_screen(struct wayland_surface *surface,
++                                      double wayland_x, double wayland_y,
++                                      int *screen_x, int *screen_y)
++{
++    RECT window_rect = {0};
++    int wine_x, wine_y;
++
++    wayland_surface_coords_to_wine(surface, wayland_x, wayland_y,
++                                   &wine_x, &wine_y);
++
++    GetWindowRect(surface->hwnd, &window_rect);
++
++    *screen_x = wine_x + window_rect.left;
++    *screen_y = wine_y + window_rect.top;
++
++    TRACE("hwnd=%p wayland=%.2f,%.2f rect=%s => screen=%d,%d\n",
++          surface->hwnd, wayland_x, wayland_y, wine_dbgstr_rect(&window_rect),
++          *screen_x, *screen_y);
++}
++
+ /**********************************************************************
+  *          wayland_surface_coords_from_wine
+  *
+@@ -479,6 +506,19 @@ void wayland_surface_coords_rounded_from_wine(struct wayland_surface *surface,
+     *wayland_y = round(w_y);
+ }
+ 
++/**********************************************************************
++ *          wayland_surface_coords_to_wine
++ *
++ * Converts the surface-local coordinates to wine windows-local coordinates.
++ */
++void wayland_surface_coords_to_wine(struct wayland_surface *surface,
++                                    double wayland_x, double wayland_y,
++                                    int *wine_x, int *wine_y)
++{
++    *wine_x = round(wayland_x);
++    *wine_y = round(wayland_y);
++}
++
+ /**********************************************************************
+  *          wayland_surface_ref
+  *
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index a3cde85999b..09460f01da9 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -245,12 +245,18 @@ BOOL wayland_surface_commit_buffer(struct wayland_surface *surface,
+ void wayland_surface_destroy(struct wayland_surface *surface);
+ void wayland_surface_unmap(struct wayland_surface *surface);
+ void wayland_surface_ack_pending_configure(struct wayland_surface *surface);
++void wayland_surface_coords_to_screen(struct wayland_surface *surface,
++                                      double wayland_x, double wayland_y,
++                                      int *screen_x, int *screen_y);
+ void wayland_surface_coords_from_wine(struct wayland_surface *surface,
+                                       int wine_x, int wine_y,
+                                       double *wayland_x, double *wayland_y);
+ void wayland_surface_coords_rounded_from_wine(struct wayland_surface *surface,
+                                               int wine_x, int wine_y,
+                                               int *wayland_x, int *wayland_y);
++void wayland_surface_coords_to_wine(struct wayland_surface *surface,
++                                    double wayland_x, double wayland_y,
++                                    int *wine_x, int *wine_y);
+ struct wayland_surface *wayland_surface_ref(struct wayland_surface *surface);
+ void wayland_surface_unref(struct wayland_surface *surface);
+ 
+-- 
+2.34.1
+

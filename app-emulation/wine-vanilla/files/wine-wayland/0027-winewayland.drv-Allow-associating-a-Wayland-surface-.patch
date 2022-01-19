@@ -1,0 +1,52 @@
+From fff9db33a12ab5b853a27ce9c00312eeb6629659 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Tue, 28 Sep 2021 13:26:30 +0300
+Subject: [PATCH 027/147] winewayland.drv: Allow associating a Wayland surface
+ with a HWND.
+
+There is no initial HWND association. It's the responsibility of the
+surface creator to set it.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland_surface.c | 4 ++--
+ dlls/winewayland.drv/waylanddrv.h      | 1 +
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index 6773a4515d3..155d2789ec9 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -31,7 +31,7 @@ static void handle_xdg_surface_configure(void *data, struct xdg_surface *xdg_sur
+ {
+     struct wayland_surface *surface = data;
+ 
+-    TRACE("serial=%u\n", serial);
++    TRACE("hwnd=%p serial=%u\n", surface->hwnd, serial);
+ 
+     surface->pending.serial = serial;
+ 
+@@ -358,7 +358,7 @@ BOOL wayland_surface_commit_buffer(struct wayland_surface *surface,
+  */
+ void wayland_surface_destroy(struct wayland_surface *surface)
+ {
+-    TRACE("surface=%p\n", surface);
++    TRACE("surface=%p hwnd=%p\n", surface, surface->hwnd);
+ 
+     if (surface->xdg_toplevel)
+     {
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index 2ed617b3066..1c39fa0c227 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -127,6 +127,7 @@ struct wayland_surface
+     struct xdg_surface *xdg_surface;
+     struct xdg_toplevel *xdg_toplevel;
+     struct wayland_surface *parent;
++    HWND hwnd;
+     CRITICAL_SECTION crit;
+     struct wayland_surface_configure pending;
+     struct wayland_surface_configure current;
+-- 
+2.34.1
+

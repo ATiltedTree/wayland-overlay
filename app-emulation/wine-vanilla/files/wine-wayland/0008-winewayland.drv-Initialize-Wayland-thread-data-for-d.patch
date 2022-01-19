@@ -1,0 +1,115 @@
+From 10ba3098638506872c486246c50317ff3aee884f Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Tue, 31 Aug 2021 17:39:54 +0300
+Subject: [PATCH 008/147] winewayland.drv: Initialize Wayland thread data for
+ desktop window thread.
+
+Having access to the Wayland thread data will allow the desktop process
+to eventually access information that requires interaction with the
+Wayland compositor. A prime example is accessing display information.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/Makefile.in       |  1 +
+ dlls/winewayland.drv/waylanddrv.h      |  6 ++++
+ dlls/winewayland.drv/waylanddrv_main.c |  1 +
+ dlls/winewayland.drv/window.c          | 49 ++++++++++++++++++++++++++
+ 4 files changed, 57 insertions(+)
+ create mode 100644 dlls/winewayland.drv/window.c
+
+diff --git a/dlls/winewayland.drv/Makefile.in b/dlls/winewayland.drv/Makefile.in
+index eac64770c64..450b43af5d1 100644
+--- a/dlls/winewayland.drv/Makefile.in
++++ b/dlls/winewayland.drv/Makefile.in
+@@ -12,5 +12,6 @@ EXTRADLLFLAGS = -mcygwin
+ C_SRCS = \
+ 	wayland.c \
+ 	waylanddrv_main.c \
++	window.c \
+ 
+ RC_SRCS = version.rc
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index 9728811c313..74133c90c58 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -76,4 +76,10 @@ BOOL wayland_process_init(void);
+ BOOL wayland_init(struct wayland *wayland);
+ void wayland_deinit(struct wayland *wayland);
+ 
++/**********************************************************************
++ *          USER driver functions
++ */
++
++extern BOOL CDECL WAYLAND_CreateWindow(HWND hwnd) DECLSPEC_HIDDEN;
++
+ #endif /* __WINE_WAYLANDDRV_H */
+diff --git a/dlls/winewayland.drv/waylanddrv_main.c b/dlls/winewayland.drv/waylanddrv_main.c
+index 905d1000c2d..7ee7ec9435e 100644
+--- a/dlls/winewayland.drv/waylanddrv_main.c
++++ b/dlls/winewayland.drv/waylanddrv_main.c
+@@ -79,6 +79,7 @@ static void CDECL WAYLAND_ThreadDetach(void)
+ 
+ static const struct user_driver_funcs waylanddrv_funcs =
+ {
++    .pCreateWindow = WAYLAND_CreateWindow,
+     .pThreadDetach = WAYLAND_ThreadDetach,
+ };
+ 
+diff --git a/dlls/winewayland.drv/window.c b/dlls/winewayland.drv/window.c
+new file mode 100644
+index 00000000000..66e5c632ed8
+--- /dev/null
++++ b/dlls/winewayland.drv/window.c
+@@ -0,0 +1,49 @@
++/*
++ * Window related functions
++ *
++ * Copyright 1993, 1994, 1995, 1996, 2001, 2013-2017 Alexandre Julliard
++ * Copyright 1993 David Metcalfe
++ * Copyright 1995, 1996 Alex Korobka
++ * Copyright 2020 Alexandros Frantzis for Collabora Ltd
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#include "config.h"
++
++#include "waylanddrv.h"
++
++#include "wine/debug.h"
++
++#include "winuser.h"
++
++WINE_DEFAULT_DEBUG_CHANNEL(waylanddrv);
++
++/**********************************************************************
++ *           WAYLAND_CreateWindow
++ */
++BOOL CDECL WAYLAND_CreateWindow(HWND hwnd)
++{
++    TRACE("%p\n", hwnd);
++
++    if (hwnd == GetDesktopWindow())
++    {
++        /* Initialize wayland so that the desktop process has access
++         * to all the wayland related information (e.g., displays). */
++        wayland_init_thread_data();
++    }
++
++    return TRUE;
++}
+-- 
+2.34.1
+

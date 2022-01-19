@@ -1,0 +1,58 @@
+From 1b9c29145c824bb515b3b8817a9ab619a44fefac Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Mon, 4 Oct 2021 17:06:56 +0300
+Subject: [PATCH 120/147] winewayland.drv: Enable Vulkan driver.
+
+Expose the Vulkan driver through the corresponding function of the USER
+driver.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/vulkan.c          | 8 ++++++++
+ dlls/winewayland.drv/waylanddrv.h      | 1 +
+ dlls/winewayland.drv/waylanddrv_main.c | 1 +
+ 3 files changed, 10 insertions(+)
+
+diff --git a/dlls/winewayland.drv/vulkan.c b/dlls/winewayland.drv/vulkan.c
+index aa998fe6d4c..a6742549423 100644
+--- a/dlls/winewayland.drv/vulkan.c
++++ b/dlls/winewayland.drv/vulkan.c
+@@ -938,3 +938,11 @@ void wayland_invalidate_vulkan_objects(HWND hwnd)
+ }
+ 
+ #endif /* SONAME_LIBVULKAN */
++
++/**********************************************************************
++ *           WAYLAND_wine_get_vulkan_driver
++ */
++const struct vulkan_funcs * CDECL WAYLAND_wine_get_vulkan_driver(UINT version)
++{
++    return wayland_get_vulkan_driver(version);
++}
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index beb8df211eb..fa17f8c1d6c 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -520,6 +520,7 @@ extern void CDECL WAYLAND_WindowPosChanged(HWND hwnd, HWND insert_after, UINT sw
+ extern BOOL CDECL WAYLAND_WindowPosChanging(HWND hwnd, HWND insert_after, UINT swp_flags,
+                                             const RECT *window_rect, const RECT *client_rect,
+                                             RECT *visible_rect, struct window_surface **surface) DECLSPEC_HIDDEN;
++extern const struct vulkan_funcs * CDECL WAYLAND_wine_get_vulkan_driver(UINT version) DECLSPEC_HIDDEN;
+ 
+ /**********************************************************************
+  *          GDI driver functions
+diff --git a/dlls/winewayland.drv/waylanddrv_main.c b/dlls/winewayland.drv/waylanddrv_main.c
+index d51376e25b4..09949a7af14 100644
+--- a/dlls/winewayland.drv/waylanddrv_main.c
++++ b/dlls/winewayland.drv/waylanddrv_main.c
+@@ -150,6 +150,7 @@ const struct user_driver_funcs waylanddrv_funcs =
+     .pWindowMessage = WAYLAND_WindowMessage,
+     .pWindowPosChanged = WAYLAND_WindowPosChanged,
+     .pWindowPosChanging = WAYLAND_WindowPosChanging,
++    .pwine_get_vulkan_driver = WAYLAND_wine_get_vulkan_driver,
+ };
+ 
+ /***********************************************************************
+-- 
+2.34.1
+

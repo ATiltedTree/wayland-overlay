@@ -1,0 +1,127 @@
+From 6e10b6b9ed32e1c3fae3146b85b7ddc06a929d41 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Tue, 26 Oct 2021 13:16:38 +0300
+Subject: [PATCH 060/147] winewayland.drv: Track the Wayland output containing
+ a window.
+
+Track the output Wine considers to contain the window backed by a
+surface. Transiently, this may be different from the output we consider
+to be the "main" one for this surface. We will use this information in
+upcoming commits to make an educated guess about which Wayland output a
+surface will be displayed on, in case the Wayland compositor has not yet
+sent the relevant output enter event(s) for a surface.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland.c         |  4 +++
+ dlls/winewayland.drv/wayland_surface.c | 38 ++++++++++++++++++++++++++
+ dlls/winewayland.drv/waylanddrv.h      |  3 ++
+ dlls/winewayland.drv/window.c          |  2 ++
+ 4 files changed, 47 insertions(+)
+
+diff --git a/dlls/winewayland.drv/wayland.c b/dlls/winewayland.drv/wayland.c
+index 10713e29871..414c2c4885b 100644
+--- a/dlls/winewayland.drv/wayland.c
++++ b/dlls/winewayland.drv/wayland.c
+@@ -188,7 +188,11 @@ static void registry_handle_global_remove(void *data, struct wl_registry *regist
+             /* Remove the output from toplevels, as some compositors don't send
+              * a leave event if the output is disconnected. */
+             wl_list_for_each(surface, &wayland->toplevel_list, link)
++            {
+                 wayland_surface_leave_output(surface, output);
++                if (surface->wine_output == output)
++                    wayland_surface_set_wine_output(surface, NULL);
++            }
+ 
+             wayland_output_destroy(output);
+             if (wayland_is_process(wayland))
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index 5d88ef88d87..8f90e94b85c 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -328,6 +328,7 @@ void wayland_surface_make_subsurface(struct wayland_surface *surface,
+     wl_subsurface_set_desync(surface->wl_subsurface);
+ 
+     surface->main_output = parent->main_output;
++    surface->wine_output = parent->wine_output;
+ 
+     wl_surface_commit(surface->wl_surface);
+ 
+@@ -874,3 +875,40 @@ void wayland_surface_leave_output(struct wayland_surface *surface,
+         wayland_surface_set_main_output(surface, origin);
+     }
+ }
++
++static void wayland_surface_tree_set_wine_output(struct wayland_surface *surface,
++                                                 struct wayland_output *output)
++{
++    struct wayland_surface *child;
++
++    surface->wine_output = output;
++
++    EnterCriticalSection(&surface->crit);
++
++    wl_list_for_each(child, &surface->child_list, link)
++        wayland_surface_tree_set_wine_output(child, output);
++
++    LeaveCriticalSection(&surface->crit);
++}
++
++/**********************************************************************
++ *          wayland_surface_set_wine_output
++ *
++ * Sets the output which Wine considers to contain the window backed by this
++ * surface. Transiently, this may be different from the output we consider to
++ * be the "main" one for this surface.
++ */
++void wayland_surface_set_wine_output(struct wayland_surface *surface,
++                                     struct wayland_output *output)
++{
++    /* Don't update non-toplevels. */
++    if (surface->parent) return;
++
++    TRACE("surface=%p output->name=%s => output->name=%s\n",
++          surface,
++          surface->wine_output ? surface->wine_output->name : NULL,
++          output ? output->name : NULL);
++
++    if (surface->wine_output != output)
++        wayland_surface_tree_set_wine_output(surface, output);
++}
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index ed659873f20..00451445faf 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -197,6 +197,7 @@ struct wayland_surface
+     enum wayland_surface_role role;
+     struct wl_list output_ref_list;
+     struct wayland_output *main_output;
++    struct wayland_output *wine_output;
+     BOOL drawing_allowed;
+     struct wl_list child_list;
+ };
+@@ -336,6 +337,8 @@ struct wayland_surface *wayland_surface_ref(struct wayland_surface *surface);
+ void wayland_surface_unref(struct wayland_surface *surface);
+ void wayland_surface_leave_output(struct wayland_surface *surface,
+                                   struct wayland_output *output);
++void wayland_surface_set_wine_output(struct wayland_surface *surface,
++                                     struct wayland_output *output);
+ 
+ /**********************************************************************
+  *          Wayland SHM buffer
+diff --git a/dlls/winewayland.drv/window.c b/dlls/winewayland.drv/window.c
+index e6cd2efec19..8fe743c49ef 100644
+--- a/dlls/winewayland.drv/window.c
++++ b/dlls/winewayland.drv/window.c
+@@ -571,6 +571,8 @@ static BOOL wayland_win_data_update_wayland_xdg_state(struct wayland_win_data *d
+           mi.rcMonitor.bottom - mi.rcMonitor.top,
+           data->maximized, data->fullscreen, data->handling_wayland_configure_event);
+ 
++    wayland_surface_set_wine_output(data->wayland_surface, output);
++
+     /* If we are currently handling a wayland configure event (i.e., we are
+      * being called through handle_wm_wayland_configure() -> SetWindowPos()),
+      * use the event configure flags directly. Otherwise try to infer the flags
+-- 
+2.34.1
+

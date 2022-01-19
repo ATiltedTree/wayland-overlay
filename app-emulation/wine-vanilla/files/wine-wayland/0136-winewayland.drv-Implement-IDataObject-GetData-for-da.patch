@@ -1,0 +1,79 @@
+From 76ffe89664b37714f1be03a9b36a5acf22f8b981 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Wed, 22 Sep 2021 17:59:58 +0300
+Subject: [PATCH 136/147] winewayland.drv: Implement IDataObject::GetData for
+ data offers.
+
+If the associated data offer has a mime type matching the requested
+Windows clipboard format, import the data into a HGLOBAL memory object.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland_data_device.c | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/dlls/winewayland.drv/wayland_data_device.c b/dlls/winewayland.drv/wayland_data_device.c
+index dbc100b41b9..ca64400f381 100644
+--- a/dlls/winewayland.drv/wayland_data_device.c
++++ b/dlls/winewayland.drv/wayland_data_device.c
+@@ -20,6 +20,8 @@
+ 
+ #include "config.h"
+ 
++#define NONAMELESSUNION
++
+ #include "waylanddrv.h"
+ 
+ #include "wine/heap.h"
+@@ -48,6 +50,7 @@ struct wayland_data_offer
+     struct wl_array types;
+     uint32_t source_actions;
+     uint32_t action;
++    const char *accepted_mime_type;
+     IDataObject data_object;
+ };
+ 
+@@ -680,8 +683,32 @@ static HRESULT WINAPI dataOfferDataObject_GetData(IDataObject *data_object,
+                                                   FORMATETC *format_etc,
+                                                   STGMEDIUM *medium)
+ {
++    HRESULT hr;
++    struct wayland_data_offer *data_offer;
++    struct wayland_data_device_format *format;
++
+     TRACE("(%p, %p, %p)\n", data_object, format_etc, medium);
+ 
++    hr = IDataObject_QueryGetData(data_object, format_etc);
++    if (!SUCCEEDED(hr))
++        return hr;
++
++    data_offer = wayland_data_offer_from_data_object(data_object);
++
++    /* A successful QueryGetData invocation sets a valid accepted_mime_type */
++    assert(data_offer->accepted_mime_type);
++
++    format = wayland_data_device_format_for_mime_type(data_offer->accepted_mime_type);
++    if (format)
++    {
++        medium->tymed = TYMED_HGLOBAL;
++        medium->u.hGlobal = wayland_data_offer_import_format(data_offer, format);
++        if (medium->u.hGlobal == NULL)
++            return E_OUTOFMEMORY;
++        medium->pUnkForRelease = 0;
++        return S_OK;
++    }
++
+     return E_UNEXPECTED;
+ }
+ 
+@@ -718,6 +745,7 @@ static HRESULT WINAPI dataOfferDataObject_QueryGetData(IDataObject *data_object,
+         if (format && format->clipboard_format == format_etc->cfFormat)
+         {
+             TRACE("found offer %s for clipboard format %u\n", *p, format->clipboard_format);
++            data_offer->accepted_mime_type = format->mime_type;
+             return S_OK;
+         }
+     }
+-- 
+2.34.1
+

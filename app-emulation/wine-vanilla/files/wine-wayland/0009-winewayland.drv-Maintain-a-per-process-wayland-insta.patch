@@ -1,0 +1,101 @@
+From 73d76029c386e741c413aa6e819da4a7d327693f Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Mon, 8 Nov 2021 12:34:39 +0200
+Subject: [PATCH 009/147] winewayland.drv: Maintain a per-process wayland
+ instance.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland.c    | 52 ++++++++++++++++++++++++++++++-
+ dlls/winewayland.drv/waylanddrv.h |  3 ++
+ 2 files changed, 54 insertions(+), 1 deletion(-)
+
+diff --git a/dlls/winewayland.drv/wayland.c b/dlls/winewayland.drv/wayland.c
+index c81a220ee27..82c61589349 100644
+--- a/dlls/winewayland.drv/wayland.c
++++ b/dlls/winewayland.drv/wayland.c
+@@ -23,10 +23,22 @@
+ #include "waylanddrv.h"
+ 
+ #include "wine/debug.h"
++#include "wine/heap.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(waylanddrv);
+ 
+ struct wl_display *process_wl_display = NULL;
++static struct wayland *process_wayland = NULL;
++CRITICAL_SECTION process_wayland_section;
++static CRITICAL_SECTION_DEBUG process_wayland_critsect_debug =
++{
++    0, 0, &process_wayland_section,
++    { &process_wayland_critsect_debug.ProcessLocksList,
++      &process_wayland_critsect_debug.ProcessLocksList },
++      0, 0, { (DWORD_PTR)(__FILE__ ": process_wayland_section") }
++};
++CRITICAL_SECTION process_wayland_section = { &process_wayland_critsect_debug,
++                                             -1, 0, 0, 0, 0 };
+ 
+ /**********************************************************************
+  *          Registry handling
+@@ -137,5 +149,43 @@ void wayland_deinit(struct wayland *wayland)
+ BOOL wayland_process_init(void)
+ {
+     process_wl_display = wl_display_connect(NULL);
+-    return process_wl_display != NULL;
++    if (!process_wl_display)
++        return FALSE;
++
++    process_wayland = heap_alloc_zero(sizeof(*process_wayland));
++    if (!process_wayland)
++        return FALSE;
++
++    return wayland_init(process_wayland);
++}
++
++/**********************************************************************
++ *          wayland_is_process
++ *
++ *  Checks whether a wayland instance is the per-process one.
++ */
++BOOL wayland_is_process(struct wayland *wayland)
++{
++    return wayland == process_wayland;
++}
++
++/**********************************************************************
++ *          wayland_process_acquire
++ *
++ *  Acquires the per-process wayland instance.
++ */
++struct wayland *wayland_process_acquire(void)
++{
++    EnterCriticalSection(&process_wayland_section);
++    return process_wayland;
++}
++
++/**********************************************************************
++ *          wayland_process_release
++ *
++ *  Releases the per-process wayland instance.
++ */
++void wayland_process_release(void)
++{
++    LeaveCriticalSection(&process_wayland_section);
+ }
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index 74133c90c58..ecad650ce6a 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -75,6 +75,9 @@ static inline struct wayland_thread_data *wayland_thread_data(void)
+ BOOL wayland_process_init(void);
+ BOOL wayland_init(struct wayland *wayland);
+ void wayland_deinit(struct wayland *wayland);
++BOOL wayland_is_process(struct wayland *wayland);
++struct wayland *wayland_process_acquire(void);
++void wayland_process_release(void);
+ 
+ /**********************************************************************
+  *          USER driver functions
+-- 
+2.34.1
+

@@ -1,0 +1,68 @@
+From bff6bfa615624fed3616b8be3bf2c97daac2b9cc Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Wed, 22 Sep 2021 17:30:21 +0300
+Subject: [PATCH 135/147] winewayland.drv: Implement IDataObject::QueryGetData
+ for data offers.
+
+Check if for any of the available mime types of the associated data
+offer we support converting from that mime type to the requested Windows
+clipboard format.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland_data_device.c | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/dlls/winewayland.drv/wayland_data_device.c b/dlls/winewayland.drv/wayland_data_device.c
+index 9b4d484a670..dbc100b41b9 100644
+--- a/dlls/winewayland.drv/wayland_data_device.c
++++ b/dlls/winewayland.drv/wayland_data_device.c
+@@ -243,6 +243,11 @@ static HGLOBAL wayland_data_offer_import_format(struct wayland_data_offer *data_
+     return mem_handle;
+ }
+ 
++static struct wayland_data_offer *wayland_data_offer_from_data_object(struct IDataObject *data_object)
++{
++    return CONTAINING_RECORD(data_object, struct wayland_data_offer, data_object);
++}
++
+ /**********************************************************************
+  *          wl_data_device handling
+  */
+@@ -691,10 +696,33 @@ static HRESULT WINAPI dataOfferDataObject_GetDataHere(IDataObject *data_object,
+ static HRESULT WINAPI dataOfferDataObject_QueryGetData(IDataObject *data_object,
+                                                        FORMATETC *format_etc)
+ {
++    struct wayland_data_offer *data_offer;
++    char **p;
++
+     TRACE("(%p, %p={.tymed=0x%x, .dwAspect=%d, .cfFormat=%d}\n",
+           data_object, format_etc, format_etc->tymed, format_etc->dwAspect,
+           format_etc->cfFormat);
+ 
++    if (format_etc->tymed && !(format_etc->tymed & TYMED_HGLOBAL))
++    {
++        FIXME("only HGLOBAL medium types supported right now\n");
++        return DV_E_TYMED;
++    }
++
++    data_offer = wayland_data_offer_from_data_object(data_object);
++
++    wl_array_for_each(p, &data_offer->types)
++    {
++        struct wayland_data_device_format *format =
++            wayland_data_device_format_for_mime_type(*p);
++        if (format && format->clipboard_format == format_etc->cfFormat)
++        {
++            TRACE("found offer %s for clipboard format %u\n", *p, format->clipboard_format);
++            return S_OK;
++        }
++    }
++
++    TRACE("didn't find offer for clipboard format %u\n", format_etc->cfFormat);
+     return DV_E_FORMATETC;
+ }
+ 
+-- 
+2.34.1
+

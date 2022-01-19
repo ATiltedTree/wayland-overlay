@@ -1,0 +1,465 @@
+From a14ceb9775862677fcc205925c752d11343df385 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Wed, 15 Sep 2021 16:18:20 +0300
+Subject: [PATCH 095/147] winewayland.drv: Implement ClipCursor.
+
+Implement cursor clipping by using the zwp_pointer_constraints_v1
+and the zwp_relative_pointer_v1 Wayland protocols.
+
+We use a set of heurestics to decide when to constraint the Wayland
+pointer and which form of constraint to use for the focused surface:
+
+1. If the cursor isn't visible (i.e., we don't have a current cursor)
+   and we have an effective clip for a window, lock the pointer in
+   the corresponding Wayland surface and emit relative events (typical
+   case for first/third-person perspective 3D games).
+
+2. If the cursor is visible, and we have an effective clip for a window,
+   confine the cursor to the clipped area within the corresponding
+   Wayland surface and emit absolute events.
+
+3. Otherwise, don't constrain.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/Makefile.in       |   1 +
+ dlls/winewayland.drv/wayland.c         |   8 ++
+ dlls/winewayland.drv/wayland_cursor.c  |  28 ++++
+ dlls/winewayland.drv/wayland_surface.c | 188 +++++++++++++++++++++++++
+ dlls/winewayland.drv/waylanddrv.h      |  15 ++
+ dlls/winewayland.drv/waylanddrv_main.c |   1 +
+ dlls/winewayland.drv/window.c          |  23 +++
+ 7 files changed, 264 insertions(+)
+
+diff --git a/dlls/winewayland.drv/Makefile.in b/dlls/winewayland.drv/Makefile.in
+index 632c551ee6c..267294e9383 100644
+--- a/dlls/winewayland.drv/Makefile.in
++++ b/dlls/winewayland.drv/Makefile.in
+@@ -30,6 +30,7 @@ C_SRCS = \
+ WAYLAND_PROTOCOL_SRCS = \
+ 	$(WAYLAND_PROTOCOLS_DATADIR)/stable/viewporter/viewporter.xml \
+ 	$(WAYLAND_PROTOCOLS_DATADIR)/stable/xdg-shell/xdg-shell.xml \
++	$(WAYLAND_PROTOCOLS_DATADIR)/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml \
+ 	$(WAYLAND_PROTOCOLS_DATADIR)/unstable/relative-pointer/relative-pointer-unstable-v1.xml \
+ 	$(WAYLAND_PROTOCOLS_DATADIR)/unstable/xdg-output/xdg-output-unstable-v1.xml \
+ 
+diff --git a/dlls/winewayland.drv/wayland.c b/dlls/winewayland.drv/wayland.c
+index c1d3f47369c..9adb1883669 100644
+--- a/dlls/winewayland.drv/wayland.c
++++ b/dlls/winewayland.drv/wayland.c
+@@ -29,6 +29,7 @@
+ 
+ #include <errno.h>
+ #include <fcntl.h>
++#include <limits.h>
+ #include <poll.h>
+ #include <unistd.h>
+ 
+@@ -171,6 +172,11 @@ static void registry_handle_global(void *data, struct wl_registry *registry,
+     {
+         wayland->wp_viewporter = wl_registry_bind(registry, id, &wp_viewporter_interface, 1);
+     }
++    else if (strcmp(interface, "zwp_pointer_constraints_v1") == 0)
++    {
++        wayland->zwp_pointer_constraints_v1 =
++            wl_registry_bind(registry, id, &zwp_pointer_constraints_v1_interface, 1);
++    }
+     else if (strcmp(interface, "zwp_relative_pointer_manager_v1") == 0)
+     {
+         wayland->zwp_relative_pointer_manager_v1 =
+@@ -263,6 +269,8 @@ BOOL wayland_init(struct wayland *wayland)
+     wl_list_init(&wayland->output_list);
+     wl_list_init(&wayland->toplevel_list);
+ 
++    SetRect(&wayland->cursor_clip, INT_MIN, INT_MIN, INT_MAX, INT_MAX);
++
+     /* Populate registry */
+     wl_registry_add_listener(wayland->wl_registry, &registry_listener, wayland);
+ 
+diff --git a/dlls/winewayland.drv/wayland_cursor.c b/dlls/winewayland.drv/wayland_cursor.c
+index 06053cde139..78ff858fa45 100644
+--- a/dlls/winewayland.drv/wayland_cursor.c
++++ b/dlls/winewayland.drv/wayland_cursor.c
+@@ -340,6 +340,10 @@ static BOOL wayland_set_cursor(HCURSOR hcursor)
+ 
+     SendMessageW(foreground, WM_WAYLAND_SET_CURSOR, 0, (LPARAM)hcursor);
+ 
++    /* Cursor visibility affects pointer confinement mode. */
++    SendMessageW(foreground, WM_WAYLAND_POINTER_CONFINEMENT_UPDATE,
++                 WAYLAND_POINTER_CONFINEMENT_RETAIN_CLIP, 0);
++
+     return TRUE;
+ }
+ 
+@@ -375,3 +379,27 @@ void CDECL WAYLAND_SetCursor(HCURSOR hcursor)
+         if (!wayland_set_cursor(hcursor)) wayland_invalidate_set_cursor();
+     }
+ }
++
++/***********************************************************************
++ *           WAYLAND_ClipCursor
++ */
++BOOL CDECL WAYLAND_ClipCursor(const RECT *clip)
++{
++    HWND foreground = NULL;
++    struct wayland *wayland = thread_wayland();
++    WPARAM confine = clip ? WAYLAND_POINTER_CONFINEMENT_SYSTEM_CLIP :
++                            WAYLAND_POINTER_CONFINEMENT_UNSET_CLIP;
++
++    if (wayland && wayland->pointer.focused_surface)
++        foreground = wayland->pointer.focused_surface->hwnd;
++
++    if (!foreground)
++        foreground = GetForegroundWindow();
++
++    if (!foreground)
++        return FALSE;
++
++    SendMessageW(foreground, WM_WAYLAND_POINTER_CONFINEMENT_UPDATE, confine, 0);
++
++    return TRUE;
++}
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index b46c16dac1e..9918d02d5dc 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -677,6 +677,18 @@ void wayland_surface_destroy(struct wayland_surface *surface)
+         heap_free(ref);
+     }
+ 
++    if (surface->zwp_locked_pointer_v1)
++    {
++        zwp_locked_pointer_v1_destroy(surface->zwp_locked_pointer_v1);
++        surface->zwp_locked_pointer_v1 = NULL;
++    }
++
++    if (surface->zwp_confined_pointer_v1)
++    {
++        zwp_confined_pointer_v1_destroy(surface->zwp_confined_pointer_v1);
++        surface->zwp_confined_pointer_v1 = NULL;
++    }
++
+     if (surface->wl_egl_window)
+     {
+         wl_egl_window_destroy(surface->wl_egl_window);
+@@ -1248,6 +1260,182 @@ void wayland_surface_unref(struct wayland_surface *surface)
+         wayland_surface_destroy(surface);
+ }
+ 
++/**********************************************************************
++ *          wayland_surface_update_pointer_confinement
++ *
++ * Update pointer confinement on the surface. Confinement mode depends
++ * on the current Windows cursor clip and cursor visibility.
++ */
++void wayland_surface_update_pointer_confinement(struct wayland_surface *surface)
++{
++    struct wayland *wayland = surface->wayland;
++    struct wayland_surface *glvk;
++    struct wl_region *region;
++    RECT vscreen_rect;
++    RECT clip_rect = wayland->cursor_clip;
++    RECT client_rect = {0};
++    RECT client_clip_rect;
++    BOOL needs_lock = FALSE;
++    BOOL needs_confine = FALSE;
++
++    if (!wayland->zwp_pointer_constraints_v1 || !wayland->pointer.wl_pointer)
++        return;
++
++    wayland_get_client_rect_in_win_coords(surface->hwnd, &client_rect);
++    MapWindowPoints(surface->hwnd, NULL, (POINT*)&client_rect, 2);
++
++    vscreen_rect.top = GetSystemMetrics(SM_YVIRTUALSCREEN);
++    vscreen_rect.left = GetSystemMetrics(SM_XVIRTUALSCREEN);
++    vscreen_rect.bottom = vscreen_rect.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
++    vscreen_rect.right = vscreen_rect.left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
++
++    /* Get the effective clip area, if any. */
++    IntersectRect(&clip_rect, &clip_rect, &vscreen_rect);
++    IntersectRect(&client_clip_rect, &clip_rect, &client_rect);
++
++    TRACE("wayland=%p surface=%p (glvk=%p) clip_rect=%s client_clip_rect=%s "
++          "client=%s vscreen=%s hcursor=%p\n",
++          wayland, surface, surface->glvk,
++          wine_dbgstr_rect(&clip_rect), wine_dbgstr_rect(&client_clip_rect),
++          wine_dbgstr_rect(&client_rect),
++          wine_dbgstr_rect(&vscreen_rect),
++          wayland->pointer.hcursor);
++
++    /* If there is a GL/VK subsurface use that to apply the pointer constaints,
++     * since it's covering the whole client area. */
++    glvk = wayland_surface_ref_glvk(surface);
++    if (glvk)
++    {
++        if (surface->zwp_locked_pointer_v1)
++        {
++            zwp_locked_pointer_v1_destroy(surface->zwp_locked_pointer_v1);
++            surface->zwp_locked_pointer_v1 = NULL;
++        }
++        if (surface->zwp_confined_pointer_v1)
++        {
++            zwp_confined_pointer_v1_destroy(surface->zwp_confined_pointer_v1);
++            surface->zwp_confined_pointer_v1 = NULL;
++        }
++        surface = glvk;
++    }
++
++    /* Only confine or lock if the cursor is actually clipped within this window,
++     * or if the clip rect is empty. */
++    if (!IsRectEmpty(&client_clip_rect) || IsRectEmpty(&clip_rect))
++    {
++        /* If the cursor is not visible, and we have an effective clip (i.e.,
++         * clip is not the whole screen) lock the cursor. If the client rect is
++         * the whole screen (i.e., application is fullscreen), we can't
++         * differentiate between an explicit fullscreen clip and no effective
++         * clip (i.e., clip is the whole screen), so also lock. */
++        if (!wayland->pointer.hcursor &&
++            (!EqualRect(&clip_rect, &vscreen_rect) ||
++             EqualRect(&client_rect, &vscreen_rect)))
++        {
++            needs_lock = TRUE;
++        }
++        else if (wayland->pointer.hcursor &&
++                 !EqualRect(&clip_rect, &vscreen_rect))
++        {
++            needs_confine = TRUE;
++        }
++    }
++
++    /* Destroy unneeded interface objects. */
++    if (!needs_lock && surface->zwp_locked_pointer_v1)
++    {
++        POINT cursor_pos;
++
++        if (GetCursorPos(&cursor_pos) && PtInRect(&client_rect, cursor_pos))
++        {
++            double wayland_x, wayland_y;
++            wayland_surface_coords_from_screen(surface,
++                                               cursor_pos.x, cursor_pos.y,
++                                               &wayland_x, &wayland_y);
++
++            zwp_locked_pointer_v1_set_cursor_position_hint(
++                    surface->zwp_locked_pointer_v1,
++                    wl_fixed_from_double(wayland_x),
++                    wl_fixed_from_double(wayland_y));
++
++            wl_surface_commit(surface->wl_surface);
++        }
++
++        zwp_locked_pointer_v1_destroy(surface->zwp_locked_pointer_v1);
++        surface->zwp_locked_pointer_v1 = NULL;
++    }
++
++    if (!needs_confine && surface->zwp_confined_pointer_v1)
++    {
++        zwp_confined_pointer_v1_destroy(surface->zwp_confined_pointer_v1);
++        surface->zwp_confined_pointer_v1 = NULL;
++    }
++
++    /* Set up (or update) pointer confinement or lock. */
++    if (needs_confine)
++    {
++        double top, left, bottom, right;
++
++        wayland_surface_coords_from_screen(surface,
++                                           client_clip_rect.left,
++                                           client_clip_rect.top,
++                                           &left, &top);
++        wayland_surface_coords_from_screen(surface,
++                                           client_clip_rect.right,
++                                           client_clip_rect.bottom,
++                                           &right, &bottom);
++
++        region = wl_compositor_create_region(wayland->wl_compositor);
++        wl_region_add(region, round(left), round(top),
++                      round(right - left), round(bottom - top));
++
++        if (!surface->zwp_confined_pointer_v1)
++        {
++            surface->zwp_confined_pointer_v1 =
++                zwp_pointer_constraints_v1_confine_pointer(
++                    wayland->zwp_pointer_constraints_v1,
++                    surface->wl_surface,
++                    wayland->pointer.wl_pointer,
++                    region,
++                    ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
++        }
++        else
++        {
++            zwp_confined_pointer_v1_set_region(surface->zwp_confined_pointer_v1,
++                                               region);
++        }
++
++        wl_region_destroy(region);
++    }
++    else if (needs_lock)
++    {
++        if (!surface->zwp_locked_pointer_v1)
++        {
++            surface->zwp_locked_pointer_v1 =
++                zwp_pointer_constraints_v1_lock_pointer(
++                    wayland->zwp_pointer_constraints_v1,
++                    surface->wl_surface,
++                    wayland->pointer.wl_pointer,
++                    NULL,
++                    ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
++        }
++        else
++        {
++            zwp_locked_pointer_v1_set_region(surface->zwp_locked_pointer_v1,
++                                             NULL);
++        }
++    }
++
++    if (wayland->pointer.focused_surface == surface)
++        wayland_pointer_set_relative(&wayland->pointer, needs_lock);
++
++    if (needs_confine || needs_lock)
++        wl_surface_commit(surface->wl_surface);
++
++    if (glvk)
++        wayland_surface_unref_glvk(glvk->parent);
++}
++
+ static void wayland_surface_tree_set_main_output_and_scale(struct wayland_surface *surface,
+                                                            struct wayland_output *output,
+                                                            int scale)
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index fda12fa5718..f1bb421692d 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -30,6 +30,7 @@
+ #include <wayland-egl.h>
+ #include <xkbcommon/xkbcommon.h>
+ #include <xkbcommon/xkbcommon-compose.h>
++#include "pointer-constraints-unstable-v1-client-protocol.h"
+ #include "relative-pointer-unstable-v1-client-protocol.h"
+ #include "viewporter-client-protocol.h"
+ #include "xdg-output-unstable-v1-client-protocol.h"
+@@ -59,6 +60,7 @@ enum wayland_window_message
+     WM_WAYLAND_SURFACE_OUTPUT_CHANGE = 0x80001005,
+     WM_WAYLAND_MONITOR_CHANGE = 0x80001006,
+     WM_WAYLAND_WINDOW_SURFACE_FLUSH = 0x80001007,
++    WM_WAYLAND_POINTER_CONFINEMENT_UPDATE = 0x80001008,
+ };
+ 
+ enum wayland_surface_role
+@@ -76,6 +78,13 @@ enum wayland_configure_flags
+     WAYLAND_CONFIGURE_FLAG_FULLSCREEN = (1 << 3),
+ };
+ 
++enum wayland_pointer_confinement
++{
++    WAYLAND_POINTER_CONFINEMENT_RETAIN_CLIP,
++    WAYLAND_POINTER_CONFINEMENT_SYSTEM_CLIP,
++    WAYLAND_POINTER_CONFINEMENT_UNSET_CLIP,
++};
++
+ /**********************************************************************
+  *          Definitions for wayland types
+  */
+@@ -132,6 +141,7 @@ struct wayland
+     struct wl_shm *wl_shm;
+     struct wl_seat *wl_seat;
+     struct wp_viewporter *wp_viewporter;
++    struct zwp_pointer_constraints_v1 *zwp_pointer_constraints_v1;
+     struct zwp_relative_pointer_manager_v1 *zwp_relative_pointer_manager_v1;
+     struct zxdg_output_manager_v1 *zxdg_output_manager_v1;
+     uint32_t next_fallback_output_id;
+@@ -144,6 +154,7 @@ struct wayland
+     DWORD last_event_type;
+     int event_notification_pipe[2];
+     struct wl_list thread_link;
++    RECT cursor_clip;
+ };
+ 
+ struct wayland_output_mode
+@@ -205,6 +216,8 @@ struct wayland_surface
+     struct wl_egl_window *wl_egl_window;
+     struct wayland_surface *parent;
+     struct wayland_surface *glvk;
++    struct zwp_confined_pointer_v1 *zwp_confined_pointer_v1;
++    struct zwp_locked_pointer_v1 *zwp_locked_pointer_v1;
+     /* The offset of this surface relative to its owning win32 window */
+     int offset_x, offset_y;
+     HWND hwnd;
+@@ -374,6 +387,7 @@ void wayland_surface_find_wine_fullscreen_fit(struct wayland_surface *surface,
+ void wayland_surface_ensure_mapped(struct wayland_surface *surface);
+ struct wayland_surface *wayland_surface_ref(struct wayland_surface *surface);
+ void wayland_surface_unref(struct wayland_surface *surface);
++void wayland_surface_update_pointer_confinement(struct wayland_surface *surface);
+ void wayland_surface_leave_output(struct wayland_surface *surface,
+                                   struct wayland_output *output);
+ void wayland_surface_set_wine_output(struct wayland_surface *surface,
+@@ -467,6 +481,7 @@ void wayland_get_client_rect_in_win_coords(HWND hwnd, RECT *client_rect);
+ 
+ extern LONG CDECL WAYLAND_ChangeDisplaySettingsEx(LPCWSTR devname, LPDEVMODEW devmode,
+                                                   HWND hwnd, DWORD flags, LPVOID lpvoid) DECLSPEC_HIDDEN;
++extern BOOL CDECL WAYLAND_ClipCursor(const RECT *clip) DECLSPEC_HIDDEN;
+ extern BOOL CDECL WAYLAND_CreateWindow(HWND hwnd) DECLSPEC_HIDDEN;
+ extern void CDECL WAYLAND_DestroyWindow(HWND hwnd) DECLSPEC_HIDDEN;
+ extern BOOL CDECL WAYLAND_EnumDisplaySettingsEx(LPCWSTR name, DWORD n, LPDEVMODEW devmode, DWORD flags) DECLSPEC_HIDDEN;
+diff --git a/dlls/winewayland.drv/waylanddrv_main.c b/dlls/winewayland.drv/waylanddrv_main.c
+index 6cb3b715a6a..e6bf351aaa3 100644
+--- a/dlls/winewayland.drv/waylanddrv_main.c
++++ b/dlls/winewayland.drv/waylanddrv_main.c
+@@ -128,6 +128,7 @@ const struct user_driver_funcs waylanddrv_funcs =
+     .dc_funcs.priority = GDI_PRIORITY_GRAPHICS_DRV,
+ 
+     .pChangeDisplaySettingsEx = WAYLAND_ChangeDisplaySettingsEx,
++    .pClipCursor = WAYLAND_ClipCursor,
+     .pCreateWindow = WAYLAND_CreateWindow,
+     .pDestroyWindow = WAYLAND_DestroyWindow,
+     .pEnumDisplaySettingsEx = WAYLAND_EnumDisplaySettingsEx,
+diff --git a/dlls/winewayland.drv/window.c b/dlls/winewayland.drv/window.c
+index f98a4d24e8f..d009dacbbc3 100644
+--- a/dlls/winewayland.drv/window.c
++++ b/dlls/winewayland.drv/window.c
+@@ -30,6 +30,8 @@
+ #include "wine/debug.h"
+ #include "wine/heap.h"
+ 
++#include <limits.h>
++
+ WINE_DEFAULT_DEBUG_CHANNEL(waylanddrv);
+ 
+ /* private window data */
+@@ -837,6 +839,8 @@ static void wayland_win_data_update_wayland_surface_state(struct wayland_win_dat
+         wsurface->drawing_allowed = TRUE;
+ 
+     LeaveCriticalSection(&wsurface->crit);
++
++    wayland_surface_update_pointer_confinement(wsurface);
+ }
+ 
+ static void update_wayland_state(struct wayland_win_data *data)
+@@ -1568,6 +1572,25 @@ LRESULT CDECL WAYLAND_WindowMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+             wayland_win_data_release(data);
+         }
+         break;
++    case WM_WAYLAND_POINTER_CONFINEMENT_UPDATE:
++        {
++            struct wayland_surface *wayland_surface = wayland_surface_for_hwnd_lock(hwnd);
++            if (wayland_surface)
++            {
++                if (wp == WAYLAND_POINTER_CONFINEMENT_SYSTEM_CLIP)
++                {
++                    GetClipCursor(&wayland_surface->wayland->cursor_clip);
++                }
++                else if (wp == WAYLAND_POINTER_CONFINEMENT_UNSET_CLIP)
++                {
++                    SetRect(&wayland_surface->wayland->cursor_clip,
++                            INT_MIN, INT_MIN, INT_MAX, INT_MAX);
++                }
++                wayland_surface_update_pointer_confinement(wayland_surface);
++            }
++            wayland_surface_for_hwnd_unlock(wayland_surface);
++        }
++        break;
+     default:
+         FIXME("got window msg %x hwnd %p wp %lx lp %lx\n", msg, hwnd, wp, lp);
+     }
+-- 
+2.34.1
+

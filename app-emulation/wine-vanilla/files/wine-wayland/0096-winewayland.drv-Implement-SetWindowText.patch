@@ -1,0 +1,131 @@
+From dfea94692bea1fbb150c8598c7f335ae06cd2023 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Wed, 15 Sep 2021 17:16:49 +0300
+Subject: [PATCH 096/147] winewayland.drv: Implement SetWindowText.
+
+Inform the Wayland compositor of the window title for toplevel windows,
+transforming the title to the expected UTF-8 encoding.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland_surface.c | 25 +++++++++++++++++++++++++
+ dlls/winewayland.drv/waylanddrv.h      |  2 ++
+ dlls/winewayland.drv/waylanddrv_main.c |  1 +
+ dlls/winewayland.drv/window.c          | 22 ++++++++++++++++++++++
+ 4 files changed, 50 insertions(+)
+
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index 9918d02d5dc..ff58c4370e4 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -23,6 +23,7 @@
+ #include "waylanddrv.h"
+ #include "wine/debug.h"
+ #include "wine/heap.h"
++#include "wine/unicode.h"
+ 
+ #include "winuser.h"
+ 
+@@ -1567,3 +1568,27 @@ int wayland_surface_get_buffer_scale(struct wayland_surface *surface)
+     TRACE("hwnd=%p (toplevel=%p) => scale=%d\n", surface->hwnd, toplevel->hwnd, scale);
+     return scale;
+ }
++
++/**********************************************************************
++ *          wayland_surface_set_title
++ */
++void wayland_surface_set_title(struct wayland_surface *surface, LPCWSTR text)
++{
++    int utf8_count;
++    char *utf8 = NULL;
++
++    if (!surface->xdg_toplevel)
++        return;
++
++    TRACE("surface=%p hwnd=%p text='%s'\n",
++          surface, surface->hwnd, wine_dbgstr_w(text));
++
++    utf8_count = WideCharToMultiByte(CP_UTF8, 0, text, -1, NULL, 0, NULL, NULL);
++    if (utf8_count && (utf8 = heap_alloc(utf8_count)) &&
++        WideCharToMultiByte(CP_UTF8, 0, text, -1, utf8, utf8_count, NULL, NULL))
++    {
++        xdg_toplevel_set_title(surface->xdg_toplevel, utf8);
++    }
++
++    heap_free(utf8);
++}
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index f1bb421692d..99c72bd44c0 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -393,6 +393,7 @@ void wayland_surface_leave_output(struct wayland_surface *surface,
+ void wayland_surface_set_wine_output(struct wayland_surface *surface,
+                                      struct wayland_output *output);
+ int wayland_surface_get_buffer_scale(struct wayland_surface *surface);
++void wayland_surface_set_title(struct wayland_surface *surface, LPCWSTR title);
+ 
+ /**********************************************************************
+  *          Wayland SHM buffer
+@@ -493,6 +494,7 @@ extern void CDECL WAYLAND_SetCursor(HCURSOR hcursor) DECLSPEC_HIDDEN;
+ extern void CDECL WAYLAND_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWORD flags) DECLSPEC_HIDDEN;
+ extern void CDECL WAYLAND_SetWindowRgn(HWND hwnd, HRGN hrgn, BOOL redraw) DECLSPEC_HIDDEN;
+ extern void CDECL WAYLAND_SetWindowStyle(HWND hwnd, INT offset, STYLESTRUCT *style) DECLSPEC_HIDDEN;
++extern void CDECL WAYLAND_SetWindowText(HWND hwnd, LPCWSTR text) DECLSPEC_HIDDEN;
+ extern UINT CDECL WAYLAND_ShowWindow(HWND hwnd, INT cmd, RECT *rect, UINT swp) DECLSPEC_HIDDEN;
+ extern LRESULT CDECL WAYLAND_SysCommand(HWND hwnd, WPARAM wparam, LPARAM lparam) DECLSPEC_HIDDEN;
+ extern INT CDECL WAYLAND_ToUnicodeEx(UINT virt, UINT scan, const BYTE *state,
+diff --git a/dlls/winewayland.drv/waylanddrv_main.c b/dlls/winewayland.drv/waylanddrv_main.c
+index e6bf351aaa3..d51376e25b4 100644
+--- a/dlls/winewayland.drv/waylanddrv_main.c
++++ b/dlls/winewayland.drv/waylanddrv_main.c
+@@ -139,6 +139,7 @@ const struct user_driver_funcs waylanddrv_funcs =
+     .pSetLayeredWindowAttributes = WAYLAND_SetLayeredWindowAttributes,
+     .pSetWindowRgn = WAYLAND_SetWindowRgn,
+     .pSetWindowStyle = WAYLAND_SetWindowStyle,
++    .pSetWindowText = WAYLAND_SetWindowText,
+     .pShowWindow = WAYLAND_ShowWindow,
+     .pSysCommand = WAYLAND_SysCommand,
+     .pToUnicodeEx = WAYLAND_ToUnicodeEx,
+diff --git a/dlls/winewayland.drv/window.c b/dlls/winewayland.drv/window.c
+index d009dacbbc3..dc4cd8e3563 100644
+--- a/dlls/winewayland.drv/window.c
++++ b/dlls/winewayland.drv/window.c
+@@ -513,6 +513,13 @@ static void wayland_win_data_update_wayland_surface(struct wayland_win_data *dat
+                                           wayland, parent_surface);
+     }
+ 
++    if (surface && surface->xdg_toplevel)
++    {
++        WCHAR text[1024];
++        if (!InternalGetWindowText(data->hwnd, text, ARRAY_SIZE(text))) text[0] = 0;
++        wayland_surface_set_title(data->wayland_surface, text);
++    }
++
+     if (data->wayland_surface != surface)
+     {
+         if (data->wayland_surface)
+@@ -1077,6 +1084,21 @@ void CDECL WAYLAND_SetWindowStyle(HWND hwnd, INT offset, STYLESTRUCT *style)
+     wayland_win_data_release(data);
+ }
+ 
++/*****************************************************************
++ *		WAYLAND_SetWindowText
++ */
++void CDECL WAYLAND_SetWindowText(HWND hwnd, LPCWSTR text)
++{
++    struct wayland_surface *wsurface = wayland_surface_for_hwnd_lock(hwnd);
++
++    TRACE("hwnd=%p text=%s\n", hwnd, wine_dbgstr_w(text));
++
++    if (wsurface && wsurface->xdg_toplevel)
++        wayland_surface_set_title(wsurface, text);
++
++    wayland_surface_for_hwnd_unlock(wsurface);
++}
++
+ /***********************************************************************
+  *	     WAYLAND_SetLayeredWindowAttributes
+  */
+-- 
+2.34.1
+

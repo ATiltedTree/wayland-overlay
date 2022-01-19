@@ -1,0 +1,73 @@
+From efecc0b4e085d5c8ee833b7c4f2d0922ed7f83a3 Mon Sep 17 00:00:00 2001
+From: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+Date: Tue, 28 Sep 2021 13:24:03 +0300
+Subject: [PATCH 026/147] winewayland.drv: Add function to unmap a Wayland
+ surface.
+
+Keep track of whether a Wayland surface is mapped or not, and allow
+unmapping (i.e., hiding) it.
+
+Signed-off-by: Alexandros Frantzis <alexandros.frantzis@collabora.com>
+---
+ dlls/winewayland.drv/wayland_surface.c | 17 +++++++++++++++++
+ dlls/winewayland.drv/waylanddrv.h      |  2 ++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/dlls/winewayland.drv/wayland_surface.c b/dlls/winewayland.drv/wayland_surface.c
+index 62283af798f..6773a4515d3 100644
+--- a/dlls/winewayland.drv/wayland_surface.c
++++ b/dlls/winewayland.drv/wayland_surface.c
+@@ -342,6 +342,7 @@ BOOL wayland_surface_commit_buffer(struct wayland_surface *surface,
+     }
+ 
+     wl_surface_commit(surface->wl_surface);
++    surface->mapped = TRUE;
+ 
+     LeaveCriticalSection(&surface->crit);
+ 
+@@ -397,6 +398,22 @@ void wayland_surface_destroy(struct wayland_surface *surface)
+     heap_free(surface);
+ }
+ 
++/**********************************************************************
++ *          wayland_surface_unmap
++ *
++ * Unmaps (i.e., hides) this surface.
++ */
++void wayland_surface_unmap(struct wayland_surface *surface)
++{
++    EnterCriticalSection(&surface->crit);
++
++    wl_surface_attach(surface->wl_surface, NULL, 0, 0);
++    wl_surface_commit(surface->wl_surface);
++    surface->mapped = FALSE;
++
++    LeaveCriticalSection(&surface->crit);
++}
++
+ /**********************************************************************
+  *          wayland_surface_coords_from_wine
+  *
+diff --git a/dlls/winewayland.drv/waylanddrv.h b/dlls/winewayland.drv/waylanddrv.h
+index 953f96a5f74..2ed617b3066 100644
+--- a/dlls/winewayland.drv/waylanddrv.h
++++ b/dlls/winewayland.drv/waylanddrv.h
+@@ -130,6 +130,7 @@ struct wayland_surface
+     CRITICAL_SECTION crit;
+     struct wayland_surface_configure pending;
+     struct wayland_surface_configure current;
++    BOOL mapped;
+     LONG ref;
+     enum wayland_surface_role role;
+ };
+@@ -232,6 +233,7 @@ BOOL wayland_surface_commit_buffer(struct wayland_surface *surface,
+                                    struct wayland_shm_buffer *shm_buffer,
+                                    HRGN surface_damage_region);
+ void wayland_surface_destroy(struct wayland_surface *surface);
++void wayland_surface_unmap(struct wayland_surface *surface);
+ void wayland_surface_ack_pending_configure(struct wayland_surface *surface);
+ void wayland_surface_coords_from_wine(struct wayland_surface *surface,
+                                       int wine_x, int wine_y,
+-- 
+2.34.1
+
