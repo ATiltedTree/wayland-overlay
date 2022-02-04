@@ -51,7 +51,6 @@ DEPEND="
 	dev-qt/qtgui:5[wayland?]
 	dev-qt/qtmultimedia:5
 	dev-qt/qtnetwork:5
-	dev-qt/qtquickcontrols:5
 	dev-qt/qtsql:5
 	dev-qt/qtsvg:5
 	dev-qt/qtwidgets:5
