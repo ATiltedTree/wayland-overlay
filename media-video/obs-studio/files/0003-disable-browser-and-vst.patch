@@ -1,0 +1,47 @@
+From 03e148655700c6c7563853d49e7c1b7e76cb20cf Mon Sep 17 00:00:00 2001
+From: Tilmann Meyer <me@atiltedtree.dev>
+Date: Fri, 4 Feb 2022 20:22:16 +0100
+Subject: [PATCH 3/4] disable browser and vst
+
+---
+ plugins/CMakeLists.txt | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
+
+diff --git a/plugins/CMakeLists.txt b/plugins/CMakeLists.txt
+index 6e0032098..7b406f467 100644
+--- a/plugins/CMakeLists.txt
++++ b/plugins/CMakeLists.txt
+@@ -5,18 +5,22 @@ if(NOT ENABLE_PLUGINS)
+ endif()
+ 
+ function(check_obs_browser)
+-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/obs-browser/CMakeLists.txt)
+-    add_subdirectory(obs-browser)
+-  else()
+-    message(FATAL_ERROR "OBS: obs-browser submodule not available")
++  if(ENABLE_BROWSER_SOURCE)
++    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/obs-browser/CMakeLists.txt)
++      add_subdirectory(obs-browser)
++    else()
++      message(FATAL_ERROR "OBS: obs-browser submodule not available")
++    endif()
+   endif()
+ endfunction()
+ 
+ function(check_obs_vst)
+-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/obs-vst/CMakeLists.txt)
+-    add_subdirectory(obs-vst)
+-  else()
+-    message(FATAL_ERROR "OBS: obs-vst submodule not available")
++  if(ENABLE_VST)
++    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/obs-vst/CMakeLists.txt)
++      add_subdirectory(obs-vst)
++    else()
++      message(FATAL_ERROR "OBS: obs-vst submodule not available")
++    endif()
+   endif()
+ endfunction()
+ 
+-- 
+2.35.1
+

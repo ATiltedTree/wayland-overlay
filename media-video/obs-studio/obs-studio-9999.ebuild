@@ -14,7 +14,8 @@ CEF_DIR="cef_binary_4280_linux64"
 
 if [[ ${PV} == 9999 ]]; then
 	inherit git-r3
-	EGIT_REPO_URI="https://github.com/obsproject/obs-studio.git"
+	EGIT_REPO_URI="https://github.com/PatTheMav/obs-studio.git"
+	EGIT_BRANCH="universal-build"
 	EGIT_SUBMODULES=( plugins/obs-browser )
 else
 	SRC_URI="https://github.com/obsproject/${PN}/archive/${PV}.tar.gz -> ${P}.tar.gz"
@@ -29,11 +30,11 @@ HOMEPAGE="https://obsproject.com"
 LICENSE="GPL-2"
 SLOT="0"
 IUSE="
-	+alsa browser decklink fdk jack lua nvenc pipewire
+	X +alsa browser decklink fdk jack lua nvenc pipewire
 	pulseaudio python speex +ssl truetype v4l vlc wayland
 "
 REQUIRED_USE="
-	browser? ( || ( alsa pulseaudio ) )
+	browser? ( X || ( alsa pulseaudio ) )
 	lua? ( ${LUA_REQUIRED_USE} )
 	python? ( ${PYTHON_REQUIRED_USE} )
 "
@@ -63,12 +64,14 @@ DEPEND="
 	sys-apps/dbus
 	sys-libs/zlib:=
 	virtual/udev
-	x11-libs/libX11
-	x11-libs/libXcomposite
-	x11-libs/libXfixes
-	x11-libs/libXinerama
-	x11-libs/libXrandr
-	x11-libs/libxcb:=
+	X? (
+		x11-libs/libX11
+		x11-libs/libXcomposite
+		x11-libs/libXfixes
+		x11-libs/libXinerama
+		x11-libs/libXrandr
+		x11-libs/libxcb:=
+	)
 	alsa? ( media-libs/alsa-lib )
 	browser? (
 		app-accessibility/at-spi2-atk
@@ -120,7 +123,10 @@ QA_PREBUILT="
 "
 
 PATCHES=(
-	"${FILESDIR}/${PN}-26.1.2-python-3.8.patch"
+	"${FILESDIR}"/0001-fix-wayland.patch
+	"${FILESDIR}"/0002-without-x.patch
+	"${FILESDIR}"/0003-disable-browser-and-vst.patch
+	"${FILESDIR}"/0004-fix-build-without-scripting.patch
 )
 
 pkg_setup() {
@@ -143,27 +149,22 @@ src_configure() {
 	local libdir=$(get_libdir)
 	local mycmakeargs=(
 		$(usev browser -DCEF_ROOT_DIR=../${CEF_DIR})
-		-DBUILD_BROWSER=$(usex browser)
-		-DBUILD_VST=no
+		-DENABLE_BROWSER_SOURCE=$(usex browser)
+		-DENABLE_VST=no
+		-DENABLE_AJA=no
 		-DENABLE_WAYLAND=$(usex wayland)
-		-DDISABLE_ALSA=$(usex !alsa)
-		-DDISABLE_DECKLINK=$(usex !decklink)
-		-DDISABLE_FREETYPE=$(usex !truetype)
-		-DDISABLE_JACK=$(usex !jack)
-		-DDISABLE_LIBFDK=$(usex !fdk)
+		-DENABLE_X11=$(usex X)
+		-DENABLE_ALSA=$(usex alsa)
+		-DENABLE_DECKLINK=$(usex decklink)
+		-DENABLE_FREETYPE=$(usex truetype)
+		-DENABLE_JACK=$(usex jack)
+		-DENABLE_LIBFDK=$(usex fdk)
 		-DENABLE_PIPEWIRE=$(usex pipewire)
-		-DDISABLE_PULSEAUDIO=$(usex !pulseaudio)
-		$(cmake_use_find_package pulseaudio PulseAudio)
-		-DDISABLE_SPEEXDSP=$(usex !speex)
-		-DDISABLE_V4L2=$(usex !v4l)
-		-DDISABLE_VLC=$(usex !vlc)
-		-DOBS_MULTIARCH_SUFFIX=${libdir#lib}
-		-DUNIX_STRUCTURE=1
-		-DWITH_RTMPS=$(usex ssl)
-
-		# deprecated and currently cause issues
-		# https://github.com/obsproject/obs-studio/pull/4560#issuecomment-826345608
-		-DLIBOBS_PREFER_IMAGEMAGICK=no
+		-DENABLE_PULSEAUDIO=$(usex pulseaudio)
+		-DENABLE_SPEEXDSP=$(usex speex)
+		-DENABLE_V4L2=$(usex v4l)
+		-DENABLE_VLC=$(usex vlc)
+		-DENABLE_RTMPS=$(usex ssl)
 	)
 
 	if [[ ${PV} != 9999 ]]; then
@@ -174,8 +175,8 @@ src_configure() {
 
 	if use lua || use python; then
 		mycmakeargs+=(
-			-DDISABLE_LUA=$(usex !lua)
-			-DDISABLE_PYTHON=$(usex !python)
+			-DENABLE_SCRIPTING_LUA=$(usex !lua)
+			-DENABLE_SCRIPTING_PYTHON=$(usex !python)
 			-DENABLE_SCRIPTING=yes
 		)
 	else
