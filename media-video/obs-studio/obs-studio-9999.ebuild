@@ -55,7 +55,6 @@ DEPEND="
 	dev-qt/qtsql:5
 	dev-qt/qtsvg:5
 	dev-qt/qtwidgets:5
-	dev-qt/qtx11extras:5
 	dev-qt/qtxml:5
 	media-libs/libglvnd
 	media-libs/x264:=
