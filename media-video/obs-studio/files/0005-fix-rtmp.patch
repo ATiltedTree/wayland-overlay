@@ -1,0 +1,30 @@
+From 1f522632b6c187e64eb944e48d6ca725effa5abc Mon Sep 17 00:00:00 2001
+From: Tilmann Meyer <me@atiltedtree.dev>
+Date: Fri, 4 Feb 2022 20:52:08 +0100
+Subject: [PATCH 5/5] fix rtmp
+
+---
+ plugins/obs-outputs/CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/plugins/obs-outputs/CMakeLists.txt b/plugins/obs-outputs/CMakeLists.txt
+index 894183c47..941074aca 100644
+--- a/plugins/obs-outputs/CMakeLists.txt
++++ b/plugins/obs-outputs/CMakeLists.txt
+@@ -47,11 +47,11 @@ if(OS_WINDOWS)
+   target_link_libraries(obs-outputs PRIVATE ws2_32 winmm Iphlpapi)
+ endif()
+ 
+-if(ENABLE_RTMPS STREQUAL "AUTO" OR ENABLE_RTMPS STREQUAL "ON")
++if(ENABLE_RTMPS)
+   find_package(MbedTLS)
+   find_package(ZLIB)
+   if(NOT MBEDTLS_FOUND OR NOT ZLIB_FOUND)
+-    if(ENABLE_RTMPS STREQUAL "ON")
++    if(ENABLE_RTMPS)
+       message(
+         FATAL_ERROR
+           "OBS:    -        mbedTLS or zlib not found, but required for RTMPS support."
+-- 
+2.35.1
+
