@@ -1,8 +1,7 @@
-# Copyright 1999-2021 Gentoo Authors
+# Copyright 2022 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-inherit autotools
 
 EGIT_COMMIT="9816ebb3e6fd9f23e993b8b7fcbd56f92d9c9197"
 DESCRIPTION="Portland utils for cross-platform/cross-toolkit/cross-desktop interoperability"
