@@ -4,7 +4,7 @@
 EAPI="7"
 
 FIREFOX_PATCHSET="firefox-91esr-patches-05j.tar.xz"
-WAYLAND_PATCHSET="${PV}"
+WAYLAND_PATCHSET="${PV}-r1"
 
 LLVM_MAX_SLOT=13
 
@@ -524,7 +524,6 @@ src_prepare() {
 	use lto && rm -v "${WORKDIR}"/firefox-patches/*-LTO-Only-enable-LTO-*.patch
 	eapply "${WORKDIR}/firefox-patches"
 	eapply "${WORKDIR}/firefox-wayland-${WAYLAND_PATCHSET}"
-	eapply "${FILESDIR}/wayland.patch"
 
 	# Allow user to apply any additional patches without modifing ebuild
 	eapply_user
