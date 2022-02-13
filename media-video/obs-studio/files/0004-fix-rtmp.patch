@@ -1,7 +1,7 @@
-From 1f522632b6c187e64eb944e48d6ca725effa5abc Mon Sep 17 00:00:00 2001
+From ff2957ef8ec1e780911f92a98f70f5f70b0e0bd2 Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:52:08 +0100
-Subject: [PATCH 5/5] fix rtmp
+Subject: [PATCH 4/4] fix rtmp
 
 ---
  plugins/obs-outputs/CMakeLists.txt | 4 ++--

@@ -1,7 +1,7 @@
-From 0d1cf8b754b82a21e4ac1bf287f7007369d5216d Mon Sep 17 00:00:00 2001
+From 545561082cbd270080dfc8f0922be2e9f383d159 Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 19:14:24 +0100
-Subject: [PATCH 1/5] fix wayland
+Subject: [PATCH 1/4] fix wayland
 
 ---
  cmake/Modules/FindWayland.cmake | 6 ++----

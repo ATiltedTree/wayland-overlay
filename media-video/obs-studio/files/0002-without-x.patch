@@ -1,7 +1,7 @@
-From cfbd9c2954fa85527177ff1bee237babc70c707e Mon Sep 17 00:00:00 2001
+From 2ae9a9f1652700d056415de9130ca268cb0e3e71 Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:08:19 +0100
-Subject: [PATCH 2/5] without x
+Subject: [PATCH 2/4] without x
 
 ---
  CMakeLists.txt                                |  1 +

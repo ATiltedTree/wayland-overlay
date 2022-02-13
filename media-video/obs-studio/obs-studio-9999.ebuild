@@ -124,8 +124,7 @@ PATCHES=(
 	"${FILESDIR}"/0001-fix-wayland.patch
 	"${FILESDIR}"/0002-without-x.patch
 	"${FILESDIR}"/0003-disable-browser-and-vst.patch
-	"${FILESDIR}"/0004-fix-build-without-scripting.patch
-	"${FILESDIR}"/0005-fix-rtmp.patch
+	"${FILESDIR}"/0004-fix-rtmp.patch
 )
 
 pkg_setup() {
