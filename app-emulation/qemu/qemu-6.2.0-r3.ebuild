@@ -202,7 +202,7 @@ SOFTMMU_TOOLS_DEPEND="
 	usb? ( >=virtual/libusb-1-r2[static-libs(+)] )
 	usbredir? ( >=sys-apps/usbredir-0.6[static-libs(+)] )
 	vde? ( net-misc/vde[static-libs(+)] )
-	virgl? ( media-libs/virglrenderer[static-libs(+),egl] )
+	virgl? ( media-libs/virglrenderer[static-libs(+)] )
 	virtfs? ( sys-libs/libcap )
 	xen? ( app-emulation/xen-tools:= )
 	xfs? ( sys-fs/xfsprogs[static-libs(+)] )
