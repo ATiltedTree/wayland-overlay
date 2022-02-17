@@ -4,7 +4,7 @@
 EAPI="7"
 
 FIREFOX_PATCHSET="firefox-91esr-patches-05j.tar.xz"
-WAYLAND_PATCHSET="${PV}"
+WAYLAND_PATCHSET="${PV}-r1"
 
 LLVM_MAX_SLOT=13
 
