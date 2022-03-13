@@ -57,7 +57,7 @@ DEPEND="
 	dev-qt/qtxml:5
 	media-libs/libglvnd
 	media-libs/x264:=
-	media-video/ffmpeg:=[x264]
+	media-video/ffmpeg:=[nvenc?,x264]
 	net-misc/curl
 	sys-apps/dbus
 	sys-libs/zlib:=
@@ -95,7 +95,6 @@ DEPEND="
 	fdk? ( media-libs/fdk-aac:= )
 	jack? ( virtual/jack )
 	lua? ( ${LUA_DEPS} )
-	nvenc? ( >=media-video/ffmpeg-4[video_cards_nvidia] )
 	pipewire? ( media-video/pipewire:= )
 	pulseaudio? ( media-sound/pulseaudio )
 	python? ( ${PYTHON_DEPS} )
