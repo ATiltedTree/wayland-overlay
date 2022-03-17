@@ -14,8 +14,7 @@ CEF_DIR="cef_binary_4280_linux64"
 
 if [[ ${PV} == 9999 ]]; then
 	inherit git-r3
-	EGIT_REPO_URI="https://github.com/PatTheMav/obs-studio.git"
-	EGIT_BRANCH="universal-build"
+	EGIT_REPO_URI="https://github.com/obsproject/obs-studio.git"
 	EGIT_SUBMODULES=( plugins/obs-browser )
 else
 	SRC_URI="https://github.com/obsproject/${PN}/archive/${PV}.tar.gz -> ${P}.tar.gz"
