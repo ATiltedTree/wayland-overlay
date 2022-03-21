@@ -1,30 +1,30 @@
-From 2ae9a9f1652700d056415de9130ca268cb0e3e71 Mon Sep 17 00:00:00 2001
+From 7dbc0aa1cb2626206ef07a9519596c64a727a1ed Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:08:19 +0100
 Subject: [PATCH 2/4] without x
 
 ---
  CMakeLists.txt                                |  1 +
- .../aja-output-ui/CMakeLists.txt              |  4 +-
- .../decklink-captions/CMakeLists.txt          |  4 --
- .../decklink-output-ui/CMakeLists.txt         |  4 +-
- .../frontend-tools/CMakeLists.txt             | 13 +++-
- .../auto-scene-switcher-wayland.cpp           | 17 +++++
+ .../aja-output-ui/CMakeLists.txt              |  4 +--
+ .../decklink-captions/CMakeLists.txt          |  4 ---
+ .../decklink-output-ui/CMakeLists.txt         |  3 +-
+ .../frontend-tools/CMakeLists.txt             | 11 +++++--
+ .../auto-scene-switcher-wayland.cpp           | 17 +++++++++++
  ...er-nix.cpp => auto-scene-switcher-x11.cpp} |  0
- UI/obs-app.cpp                                |  2 +
- UI/qt-wrappers.cpp                            |  2 +
- deps/glad/CMakeLists.txt                      | 12 ++--
- deps/glad/src/glad.c                          | 17 +----
- libobs-opengl/CMakeLists.txt                  | 18 ++++--
- libobs-opengl/gl-nix.c                        |  5 ++
- libobs/CMakeLists.txt                         | 30 +++++----
+ UI/obs-app.cpp                                |  2 ++
+ UI/qt-wrappers.cpp                            |  2 ++
+ deps/glad/CMakeLists.txt                      | 12 ++++----
+ deps/glad/src/glad.c                          | 17 +----------
+ libobs-opengl/CMakeLists.txt                  | 18 ++++++-----
+ libobs-opengl/gl-nix.c                        |  5 ++++
+ libobs/CMakeLists.txt                         | 30 +++++++++++--------
  libobs/obs-nix-platform.c                     |  2 +-
- libobs/obs-nix-platform.h                     |  4 +-
- libobs/obs-nix.c                              |  7 ++
+ libobs/obs-nix-platform.h                     |  4 ++-
+ libobs/obs-nix.c                              |  7 +++++
  libobs/obsconfig.h.in                         |  1 +
- plugins/linux-capture/CMakeLists.txt          | 64 ++++++++++---------
- plugins/linux-capture/linux-capture.c         | 27 +++++++-
- 20 files changed, 145 insertions(+), 89 deletions(-)
+ plugins/linux-capture/CMakeLists.txt          |  5 ++++
+ plugins/linux-pipewire/linux-pipewire.c       |  4 +++
+ 20 files changed, 92 insertions(+), 57 deletions(-)
  create mode 100644 UI/frontend-plugins/frontend-tools/auto-scene-switcher-wayland.cpp
  rename UI/frontend-plugins/frontend-tools/{auto-scene-switcher-nix.cpp => auto-scene-switcher-x11.cpp} (100%)
 
@@ -41,10 +41,10 @@ index e1ec9107d..789c0e72d 100644
    endif()
  endif()
 diff --git a/UI/frontend-plugins/aja-output-ui/CMakeLists.txt b/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
-index 98ced3942..d2921b820 100644
+index fb6bb0b1c..76353ea39 100644
 --- a/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
 +++ b/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
-@@ -79,9 +79,7 @@ elseif(OS_WINDOWS)
+@@ -77,9 +77,7 @@ elseif(OS_WINDOWS)
    target_link_libraries(aja-output-ui PRIVATE ws2_32.lib setupapi.lib Winmm.lib
                                                netapi32.lib Shlwapi.lib)
  else()
@@ -56,10 +56,10 @@ index 98ced3942..d2921b820 100644
  
  set_target_properties(aja-output-ui PROPERTIES FOLDER "frontend" PREFIX "")
 diff --git a/UI/frontend-plugins/decklink-captions/CMakeLists.txt b/UI/frontend-plugins/decklink-captions/CMakeLists.txt
-index b478d50da..dacad9826 100644
+index 9f8b5a0e4..565b073cc 100644
 --- a/UI/frontend-plugins/decklink-captions/CMakeLists.txt
 +++ b/UI/frontend-plugins/decklink-captions/CMakeLists.txt
-@@ -30,10 +30,6 @@ if(OS_MACOS)
+@@ -32,10 +32,6 @@ if(OS_MACOS)
    mark_as_advanced(COCOA)
    target_link_libraries(decklink-captions PRIVATE ${COCOA})
  
@@ -71,25 +71,24 @@ index b478d50da..dacad9826 100644
    set(MODULE_DESCRIPTION "OBS DeckLink Captions module")
    configure_file(${CMAKE_SOURCE_DIR}/cmake/bundle/windows/obs-module.rc.in
 diff --git a/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt b/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
-index 020d6b740..f4eb84243 100644
+index d83542ef0..39afb706c 100644
 --- a/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
 +++ b/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
-@@ -96,9 +96,7 @@ elseif(OS_MACOS)
+@@ -64,8 +64,7 @@ elseif(OS_MACOS)
    target_link_libraries(decklink-output-ui PRIVATE ${COCOA})
  
  elseif(OS_POSIX)
 -  find_package(X11 REQUIRED)
 -  target_link_libraries(decklink-output-ui PRIVATE X11::X11
--                                                   Qt${QT_VERSION}::GuiPrivate)
-+  target_link_libraries(decklink-output-ui PRIVATE Qt${QT_VERSION}::GuiPrivate)
++  target_link_libraries(decklink-output-ui PRIVATE
+                                                    Qt${QT_VERSION}::GuiPrivate)
  endif()
  
- setup_plugin_target(decklink-output-ui)
 diff --git a/UI/frontend-plugins/frontend-tools/CMakeLists.txt b/UI/frontend-plugins/frontend-tools/CMakeLists.txt
-index b8894ef47..2f1f0570f 100644
+index aac98f90f..3da8702cf 100644
 --- a/UI/frontend-plugins/frontend-tools/CMakeLists.txt
 +++ b/UI/frontend-plugins/frontend-tools/CMakeLists.txt
-@@ -96,11 +96,18 @@ elseif(OS_MACOS)
+@@ -100,11 +100,16 @@ elseif(OS_MACOS)
                                PROPERTIES COMPILE_FLAGS -fobjc-arc)
  
  elseif(OS_POSIX)
@@ -99,18 +98,16 @@ index b8894ef47..2f1f0570f 100644
  
 -  target_link_libraries(frontend-tools PRIVATE X11::X11)
 +    target_link_libraries(frontend-tools PRIVATE X11::X11)
-+
+ 
+-  target_sources(frontend-tools PRIVATE auto-scene-switcher-nix.cpp)
 +    target_sources(frontend-tools PRIVATE auto-scene-switcher-x11.cpp)
 +  endif()
-+
 +  if(ENABLE_WAYLAND)
 +    target_sources(frontend-tools PRIVATE auto-scene-switcher-wayland.cpp)
 +  endif()
- 
--  target_sources(frontend-tools PRIVATE auto-scene-switcher-nix.cpp)
  endif()
  
- setup_plugin_target(frontend-tools)
+ get_target_property(_SOURCES frontend-tools SOURCES)
 diff --git a/UI/frontend-plugins/frontend-tools/auto-scene-switcher-wayland.cpp b/UI/frontend-plugins/frontend-tools/auto-scene-switcher-wayland.cpp
 new file mode 100644
 index 000000000..ec35e5524
@@ -139,10 +136,10 @@ similarity index 100%
 rename from UI/frontend-plugins/frontend-tools/auto-scene-switcher-nix.cpp
 rename to UI/frontend-plugins/frontend-tools/auto-scene-switcher-x11.cpp
 diff --git a/UI/obs-app.cpp b/UI/obs-app.cpp
-index 5806134a8..b1c4b0d91 100644
+index e57aae114..0f5836b9d 100644
 --- a/UI/obs-app.cpp
 +++ b/UI/obs-app.cpp
-@@ -1414,11 +1414,13 @@ bool OBSApp::OBSInit()
+@@ -1415,11 +1415,13 @@ bool OBSApp::OBSInit()
  	qRegisterMetaType<VoidFunc>();
  
  #if !defined(_WIN32) && !defined(__APPLE__)
@@ -157,7 +154,7 @@ index 5806134a8..b1c4b0d91 100644
  #ifdef ENABLE_WAYLAND
  	if (QApplication::platformName().contains("wayland")) {
 diff --git a/UI/qt-wrappers.cpp b/UI/qt-wrappers.cpp
-index e08e8562e..43ab04eca 100644
+index c0bb30758..633e9e5f6 100644
 --- a/UI/qt-wrappers.cpp
 +++ b/UI/qt-wrappers.cpp
 @@ -121,11 +121,13 @@ bool QTToGSWindow(QWindow *window, gs_window &gswindow)
@@ -319,10 +316,10 @@ index e387eaa4b..21cad6a6d 100644
  	case OBS_NIX_PLATFORM_WAYLAND:
  		gl_vtable = gl_wayland_egl_get_winsys_vtable();
 diff --git a/libobs/CMakeLists.txt b/libobs/CMakeLists.txt
-index 54d5e28cb..e9593197d 100644
+index 57d8e9c15..a1e680b56 100644
 --- a/libobs/CMakeLists.txt
 +++ b/libobs/CMakeLists.txt
-@@ -354,27 +354,16 @@ elseif(OS_POSIX)
+@@ -358,27 +358,16 @@ elseif(OS_POSIX)
      target_compile_definitions(libobs PRIVATE ENABLE_DARRAY_TYPE_TEST)
    endif()
  
@@ -350,7 +347,7 @@ index 54d5e28cb..e9593197d 100644
    if(USE_XDG)
      target_compile_definitions(libobs PRIVATE USE_XDG)
    endif()
-@@ -403,8 +392,23 @@ elseif(OS_POSIX)
+@@ -407,8 +396,23 @@ elseif(OS_POSIX)
                                    util/platform-nix-portal.c)
    endif()
  
@@ -469,159 +466,41 @@ index 9f91b977e..49a5a1b1f 100644
  /* NOTE: Release candidate version numbers internally are always the previous
   * main release number!  For example, if the current public release is 21.0 and
 diff --git a/plugins/linux-capture/CMakeLists.txt b/plugins/linux-capture/CMakeLists.txt
-index 58a42ce84..c9ad7f0e3 100644
+index 5e93f994a..3d81fb578 100644
 --- a/plugins/linux-capture/CMakeLists.txt
 +++ b/plugins/linux-capture/CMakeLists.txt
-@@ -5,47 +5,53 @@ if(NOT ENABLE_PIPEWIRE)
-   message(STATUS "OBS:    -        PipeWire support disabled")
- endif()
+@@ -1,5 +1,10 @@
+ project(linux-capture)
  
--find_package(X11 REQUIRED)
--if(NOT TARGET X11::Xcomposite)
--  message(
--    FATAL_ERROR "OBS:  DISABLED   linux-capture - Xcomposite library not found")
--endif()
--find_package(XCB COMPONENTS XCB XFIXES RANDR SHM XINERAMA)
--
- add_library(linux-capture MODULE)
- add_library(OBS::capture ALIAS linux-capture)
- 
- target_sources(
-   linux-capture
--  PRIVATE linux-capture.c
--          xcursor.c
--          xcursor.h
--          xcursor-xcb.c
--          xcursor-xcb.h
--          xhelpers.c
--          xhelpers.h
--          xshm-input.c
--          xcomposite-main.cpp
--          xcompcap-main.cpp
--          xcompcap-main.hpp
--          xcompcap-helper.cpp
--          xcompcap-helper.hpp)
-+  PRIVATE linux-capture.c)
- 
- target_link_libraries(
-   linux-capture
-   PRIVATE OBS::libobs
--          OBS::obsglad
--          X11::X11
--          X11::Xfixes
--          X11::Xcomposite
--          XCB::XCB
--          XCB::XFIXES
--          XCB::RANDR
--          XCB::SHM
--          XCB::XINERAMA)
-+          OBS::obsglad)
- 
- set_target_properties(linux-capture PROPERTIES FOLDER "plugins")
- 
-+if(ENABLE_X11)
-+    find_package(X11 REQUIRED)
-+    message(
-+      FATAL_ERROR "OBS:    -        X11 library not found! Please install X11 or set ENABLE_X11=OFF")
-+    find_package(XCB COMPONENTS XCB XFIXES RANDR SHM XINERAMA)
-+
-+    target_sources(
-+      linux-capture
-+      PRIVATE xcursor.c
-+              xcursor.h
-+              xcursor-xcb.c
-+              xcursor-xcb.h
-+              xhelpers.c
-+              xhelpers.h
-+              xshm-input.c
-+              xcomposite-main.cpp
-+              xcompcap-main.cpp
-+              xcompcap-main.hpp
-+              xcompcap-helper.cpp
-+              xcompcap-helper.hpp)
-+
-+    target_link_libraries(
-+      linux-capture
-+      PRIVATE X11::X11
-+              X11::Xfixes
-+              X11::Xcomposite
-+              XCB::XCB
-+              XCB::XFIXES
-+              XCB::RANDR
-+              XCB::SHM
-+              XCB::XINERAMA)
++if(NOT ENABLE_X11)
++  message(STATUS "OBS:  DISABLED   linux-capture")
++  return()
 +endif()
 +
- if(ENABLE_PIPEWIRE)
-   find_package(PipeWire 0.3.32 QUIET)
-   find_package(Gio QUIET)
-diff --git a/plugins/linux-capture/linux-capture.c b/plugins/linux-capture/linux-capture.c
-index c1d38e359..dbcb5a0f5 100644
---- a/plugins/linux-capture/linux-capture.c
-+++ b/plugins/linux-capture/linux-capture.c
-@@ -25,12 +25,16 @@ OBS_DECLARE_MODULE()
- OBS_MODULE_USE_DEFAULT_LOCALE("linux-xshm", "en-US")
- MODULE_EXPORT const char *obs_module_description(void)
- {
-+#ifdef ENABLE_X11
- #ifdef ENABLE_PIPEWIRE
- 	if (obs_get_nix_platform() != OBS_NIX_PLATFORM_X11_GLX)
- 		return "PipeWire based window/screen capture for X11 and Wayland";
- 	else
- #endif
- 		return "xcomposite/xshm based window/screen capture for X11";
-+#else
-+	return "PipeWire based window/screen capture for X11 and Wayland";
-+#endif
- }
- 
- extern struct obs_source_info xshm_input;
-@@ -43,6 +47,7 @@ bool obs_module_load(void)
- 	enum obs_nix_platform_type platform = obs_get_nix_platform();
- 
- 	switch (platform) {
-+#ifdef ENABLE_X11
- 	case OBS_NIX_PLATFORM_X11_GLX:
- 		obs_register_source(&xshm_input);
- 		xcomposite_load();
-@@ -54,6 +59,7 @@ bool obs_module_load(void)
- 		pipewire_capture_load();
- #endif
- 		break;
-+#endif
- 
+ find_package(X11 REQUIRED)
+ if(NOT TARGET X11::Xcomposite)
+   message(
+diff --git a/plugins/linux-pipewire/linux-pipewire.c b/plugins/linux-pipewire/linux-pipewire.c
+index edbb0c636..af4ad3f7f 100644
+--- a/plugins/linux-pipewire/linux-pipewire.c
++++ b/plugins/linux-pipewire/linux-pipewire.c
+@@ -40,12 +40,16 @@ bool obs_module_load(void)
+ 	switch (obs_get_nix_platform()) {
  #ifdef ENABLE_WAYLAND
  	case OBS_NIX_PLATFORM_WAYLAND:
-@@ -69,10 +75,27 @@ bool obs_module_load(void)
- 
- void obs_module_unload(void)
- {
--	if (obs_get_nix_platform() == OBS_NIX_PLATFORM_X11_GLX)
-+	enum obs_nix_platform_type platform = obs_get_nix_platform();
-+
-+	switch (platform) {
-+#ifdef ENABLE_X11
-+	case OBS_NIX_PLATFORM_X11_GLX:
- 		xcomposite_unload();
++		pipewire_capture_load();
 +		break;
-+
-+	case OBS_NIX_PLATFORM_X11_EGL:
- #ifdef ENABLE_PIPEWIRE
--	else
- 		pipewire_capture_unload();
  #endif
-+		break;
++#ifdef ENABLE_X11
+ 	case OBS_NIX_PLATFORM_X11_EGL:
+ 		pipewire_capture_load();
+ 		break;
+ 	case OBS_NIX_PLATFORM_X11_GLX:
+ 		break;
 +#endif
-+
-+#ifdef ENABLE_WAYLAND
-+	case OBS_NIX_PLATFORM_WAYLAND:
-+#ifdef ENABLE_PIPEWIRE
-+		pipewire_capture_unload();
-+#endif
-+		break;
-+#endif
-+	}
- }
+ 	}
+ 
+ 	return true;
 -- 
 2.35.1
 

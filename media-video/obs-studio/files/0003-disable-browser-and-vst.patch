@@ -1,4 +1,4 @@
-From 5631a2046e7f625a7a47c6ef1d25914edff9058d Mon Sep 17 00:00:00 2001
+From e1517c7171d14c7209f21fc94ceb362a7fca85f1 Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:22:16 +0100
 Subject: [PATCH 3/4] disable browser and vst
@@ -8,7 +8,7 @@ Subject: [PATCH 3/4] disable browser and vst
  1 file changed, 12 insertions(+), 8 deletions(-)
 
 diff --git a/plugins/CMakeLists.txt b/plugins/CMakeLists.txt
-index 6e0032098..7b406f467 100644
+index 242b421d5..3e032a2ba 100644
 --- a/plugins/CMakeLists.txt
 +++ b/plugins/CMakeLists.txt
 @@ -5,18 +5,22 @@ if(NOT ENABLE_PLUGINS)
