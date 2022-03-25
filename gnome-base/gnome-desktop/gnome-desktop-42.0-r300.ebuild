@@ -1,7 +1,7 @@
-# Copyright 1999-2021 Gentoo Authors
+# Copyright 1999-2022 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=7
+EAPI=8
 inherit gnome.org meson xdg
 
 DESCRIPTION="Library with common API for various GNOME modules"
@@ -9,7 +9,7 @@ HOMEPAGE="https://gitlab.gnome.org/GNOME/gnome-desktop/"
 
 LICENSE="GPL-2+ LGPL-2+ FDL-1.1+"
 SLOT="3/19" # subslot = libgnome-desktop-3 soname version
-IUSE="debug gtk-doc +introspection seccomp systemd udev"
+IUSE="debug +introspection seccomp systemd udev"
 KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~ia64 ~ppc ~ppc64 ~riscv ~sparc ~x86 ~amd64-linux ~x86-linux ~x86-solaris"
 
 COMMON_DEPEND="
@@ -36,33 +36,47 @@ RDEPEND="${COMMON_DEPEND}
 BDEPEND="
 	app-text/docbook-xml-dtd:4.1.2
 	dev-util/gdbus-codegen
-	gtk-doc? ( >=dev-util/gtk-doc-1.14 )
 	dev-util/itstool
 	>=sys-devel/gettext-0.19.8
 	virtual/pkgconfig
 "
+# Includes X11/Xatom.h in libgnome-desktop/gnome-bg.c which comes from xorg-proto
 
 PATCHES=(
-	"${FILESDIR}"/3.32.2-optional-introspection.patch # add introspection meson option
+	"${FILESDIR}"/${PV}-meson-Fix-build_gtk4-option.patch
+	"${FILESDIR}"/${PV}-meson-Add-optionality-for-introspection.patch
 )
 
 src_prepare() {
+	default
+	xdg_environment_reset
+
 	# Don't build manual test programs that will never get run
 	sed -i -e "/'test-.*'/d" libgnome-desktop/meson.build || die
-	xdg_src_prepare
 }
 
 src_configure() {
 	local emesonargs=(
 		-Dgnome_distributor=Gentoo
 		-Ddate_in_gnome_version=true
-		-Ddesktop_docs=true
+		-Ddesktop_docs=false
 		$(meson_use debug debug_tools)
 		$(meson_use introspection)
 		$(meson_feature udev)
 		$(meson_feature systemd)
-		$(meson_use gtk-doc gtk_doc)
+		-Dgtk_doc=false
 		-Dinstalled_tests=false
+		-Dbuild_gtk4=false
+		-Dlegacy_library=true
 	)
 	meson_src_configure
+}
+
+src_install() {
+	meson_src_install
+
+	rm -r \
+		${ED}/usr/share/gnome/gnome-version.xml \
+		${ED}/usr/share/locale \
+		|| die
 }
