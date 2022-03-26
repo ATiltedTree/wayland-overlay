@@ -94,7 +94,7 @@ BDEPEND="${PYTHON_DEPS}
 			sys-devel/clang:13
 			sys-devel/llvm:13
 			clang? (
-				=sys-devel/lld-13*
+				lto? ( =sys-devel/lld-13* )
 				pgo? ( =sys-libs/compiler-rt-sanitizers-13*[profile] )
 			)
 		)
@@ -102,7 +102,7 @@ BDEPEND="${PYTHON_DEPS}
 			sys-devel/clang:12
 			sys-devel/llvm:12
 			clang? (
-				=sys-devel/lld-12*
+				lto? ( =sys-devel/lld-12* )
 				pgo? ( =sys-libs/compiler-rt-sanitizers-12*[profile] )
 			)
 		)
@@ -110,7 +110,7 @@ BDEPEND="${PYTHON_DEPS}
 			sys-devel/clang:11
 			sys-devel/llvm:11
 			clang? (
-				=sys-devel/lld-11*
+				lto? ( =sys-devel/lld-11* )
 				pgo? ( =sys-libs/compiler-rt-sanitizers-11*[profile] )
 			)
 		)
@@ -220,9 +220,11 @@ llvm_check_deps() {
 	fi
 
 	if use clang ; then
-		if ! has_version -b "=sys-devel/lld-${LLVM_SLOT}*" ; then
-			einfo "=sys-devel/lld-${LLVM_SLOT}* is missing! Cannot use LLVM slot ${LLVM_SLOT} ..." >&2
-			return 1
+		if use lto ; then
+			if ! has_version -b "=sys-devel/lld-${LLVM_SLOT}*" ; then
+				einfo "=sys-devel/lld-${LLVM_SLOT}* is missing! Cannot use LLVM slot ${LLVM_SLOT} ..." >&2
+				return 1
+			fi
 		fi
 
 		if use pgo ; then
