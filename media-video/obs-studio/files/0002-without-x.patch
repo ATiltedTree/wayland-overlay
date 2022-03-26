@@ -1,4 +1,4 @@
-From 7dbc0aa1cb2626206ef07a9519596c64a727a1ed Mon Sep 17 00:00:00 2001
+From ed9336fa35d0a972f4b802624bda41aec172f30d Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:08:19 +0100
 Subject: [PATCH 2/4] without x
@@ -136,10 +136,10 @@ similarity index 100%
 rename from UI/frontend-plugins/frontend-tools/auto-scene-switcher-nix.cpp
 rename to UI/frontend-plugins/frontend-tools/auto-scene-switcher-x11.cpp
 diff --git a/UI/obs-app.cpp b/UI/obs-app.cpp
-index e57aae114..0f5836b9d 100644
+index e62a9700e..0d2af1696 100644
 --- a/UI/obs-app.cpp
 +++ b/UI/obs-app.cpp
-@@ -1415,11 +1415,13 @@ bool OBSApp::OBSInit()
+@@ -1414,11 +1414,13 @@ bool OBSApp::OBSInit()
  	qRegisterMetaType<VoidFunc>();
  
  #if !defined(_WIN32) && !defined(__APPLE__)
@@ -285,7 +285,7 @@ index 70e2f7f81..7f2f6a57d 100644
    if(ENABLE_WAYLAND)
      find_package(
 diff --git a/libobs-opengl/gl-nix.c b/libobs-opengl/gl-nix.c
-index e387eaa4b..21cad6a6d 100644
+index e87eb007e..d4375dab0 100644
 --- a/libobs-opengl/gl-nix.c
 +++ b/libobs-opengl/gl-nix.c
 @@ -16,8 +16,11 @@
@@ -316,7 +316,7 @@ index e387eaa4b..21cad6a6d 100644
  	case OBS_NIX_PLATFORM_WAYLAND:
  		gl_vtable = gl_wayland_egl_get_winsys_vtable();
 diff --git a/libobs/CMakeLists.txt b/libobs/CMakeLists.txt
-index 57d8e9c15..a1e680b56 100644
+index 77043f8b7..d63bea717 100644
 --- a/libobs/CMakeLists.txt
 +++ b/libobs/CMakeLists.txt
 @@ -358,27 +358,16 @@ elseif(OS_POSIX)
@@ -466,7 +466,7 @@ index 9f91b977e..49a5a1b1f 100644
  /* NOTE: Release candidate version numbers internally are always the previous
   * main release number!  For example, if the current public release is 21.0 and
 diff --git a/plugins/linux-capture/CMakeLists.txt b/plugins/linux-capture/CMakeLists.txt
-index 5e93f994a..3d81fb578 100644
+index 757fea3a0..6984f1bf3 100644
 --- a/plugins/linux-capture/CMakeLists.txt
 +++ b/plugins/linux-capture/CMakeLists.txt
 @@ -1,5 +1,10 @@
@@ -479,7 +479,7 @@ index 5e93f994a..3d81fb578 100644
 +
  find_package(X11 REQUIRED)
  if(NOT TARGET X11::Xcomposite)
-   message(
+   obs_status(FATAL_ERROR "linux-capture - Xcomposite library not found.")
 diff --git a/plugins/linux-pipewire/linux-pipewire.c b/plugins/linux-pipewire/linux-pipewire.c
 index edbb0c636..af4ad3f7f 100644
 --- a/plugins/linux-pipewire/linux-pipewire.c
