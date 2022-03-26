@@ -6,7 +6,7 @@ EAPI="7"
 FIREFOX_PATCHSET="firefox-98-patches-04j.tar.xz"
 WAYLAND_PATCHSET="${PV}"
 
-LLVM_MAX_SLOT=14
+LLVM_MAX_SLOT=13
 
 PYTHON_COMPAT=( python3_{8..10} )
 PYTHON_REQ_USE="ncurses,sqlite,ssl"
@@ -90,14 +90,6 @@ BDEPEND="${PYTHON_DEPS}
 	virtual/pkgconfig
 	>=virtual/rust-1.57.0
 	|| (
-		(
-			sys-devel/clang:14
-			sys-devel/llvm:14
-			clang? (
-				=sys-devel/lld-14*
-				pgo? ( =sys-libs/compiler-rt-sanitizers-14*[profile] )
-			)
-		)
 		(
 			sys-devel/clang:13
 			sys-devel/llvm:13
