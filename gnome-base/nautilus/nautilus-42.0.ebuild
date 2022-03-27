@@ -1,7 +1,7 @@
-# Copyright 1999-2021 Gentoo Authors
+# Copyright 1999-2022 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=7
+EAPI=8
 
 inherit gnome.org gnome2-utils meson readme.gentoo-r1 virtualx xdg
 
@@ -16,13 +16,13 @@ KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~ia64 ~ppc ~ppc64 ~riscv ~sparc ~x86 ~amd64-
 
 DEPEND="
 	>=dev-libs/glib-2.67.1:2
-	>=media-libs/gexiv2-0.10.0
+	>=media-libs/gexiv2-0.14.0
 	gstreamer? ( media-libs/gstreamer:1.0
 		media-libs/gst-plugins-base:1.0 )
-	>=app-arch/gnome-autoar-0.3.0
+	>=app-arch/gnome-autoar-0.4.0
 	>=gnome-base/gnome-desktop-3.0.0:3=
 	>=x11-libs/gtk+-3.22.27:3[introspection?]
-	>=gui-libs/libhandy-1.1.90:1
+	>=gui-libs/libhandy-1.5.0:1
 	>=x11-libs/pango-1.28.3
 	selinux? ( >=sys-libs/libselinux-2.0 )
 	>=app-misc/tracker-3.0:3=
@@ -42,7 +42,6 @@ BDEPEND="
 		app-text/docbook-xml-dtd:4.1.2 )
 	>=sys-devel/gettext-0.19.8
 	virtual/pkgconfig
-	x11-base/xorg-proto
 "
 PDEPEND="
 	gnome? ( x11-themes/adwaita-icon-theme )
@@ -53,16 +52,21 @@ PDEPEND="
 
 PATCHES=(
 	"${FILESDIR}"/3.30.5-docs-build.patch # Always install pregenerated manpage, keeping docs option for gtk-doc
-	"${FILESDIR}"/41.1-optional-gstreamer.patch # Allow controlling audio-video-properties build
+	"${FILESDIR}"/42.0-optional-gstreamer.patch # Allow controlling audio-video-properties build
 )
 
 src_prepare() {
+	default
+	xdg_environment_reset
+
 	if use previewer; then
 		DOC_CONTENTS="nautilus uses gnome-extra/sushi to preview media files.
 			To activate the previewer, select a file and press space; to
 			close the previewer, press space again."
 	fi
-	xdg_src_prepare
+
+	# Disable test-nautilus-search-engine-tracker; bug #831170
+	sed -e '/^tracker_tests = /{n;N;N;d}' -i test/automated/displayless/meson.build || die
 }
 
 src_configure() {
@@ -87,6 +91,7 @@ src_install() {
 
 src_test() {
 	gnome2_environment_reset # Avoid dconf that looks at XDG_DATA_DIRS, which can sandbox fail if flatpak is installed
+	# TODO: Tests require tracker testutils (e.g. tracker-sandbox), which may need some sorting out with tracker use flag deps
 	virtx meson_src_test
 }
 
