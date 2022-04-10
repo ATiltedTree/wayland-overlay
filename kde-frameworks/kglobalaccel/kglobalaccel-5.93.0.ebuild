@@ -1,4 +1,4 @@
-# Copyright 1999-2021 Gentoo Authors
+# Copyright 1999-2022 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -27,9 +27,9 @@ DEPEND="
 	=kde-frameworks/kdbusaddons-${PVCUT}*:5
 	=kde-frameworks/kwindowsystem-${PVCUT}*:5[X?]
 	X? (
-		>=dev-qt/qtx11extras-${QTMIN}:5
 		x11-libs/libxcb
 		x11-libs/xcb-util-keysyms
+		>=dev-qt/qtx11extras-${QTMIN}:5	
 	)
 "
 RDEPEND="${DEPEND}"
