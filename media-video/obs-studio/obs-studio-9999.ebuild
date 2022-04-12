@@ -161,6 +161,8 @@ src_configure() {
 		-DENABLE_V4L2=$(usex v4l)
 		-DENABLE_VLC=$(usex vlc)
 		-DENABLE_RTMPS=$(usex ssl)
+		# Use ccache only through FEATURES
+		-DCCACHE_SUPPORT=OFF
 	)
 
 	if [[ ${PV} != 9999 ]]; then
