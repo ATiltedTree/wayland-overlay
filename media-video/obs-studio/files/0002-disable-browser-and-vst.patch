@@ -1,7 +1,7 @@
-From 9370a57dbc9f6bc5d35448921ad4cda9ed518b18 Mon Sep 17 00:00:00 2001
+From 707c3d106456e2a9ab5ba0965be38ef3eb9d2155 Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:22:16 +0100
-Subject: [PATCH 3/4] disable browser and vst
+Subject: [PATCH 2/3] disable browser and vst
 
 ---
  plugins/CMakeLists.txt | 20 ++++++++++++--------

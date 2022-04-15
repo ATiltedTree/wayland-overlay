@@ -1,7 +1,7 @@
-From ed9336fa35d0a972f4b802624bda41aec172f30d Mon Sep 17 00:00:00 2001
+From f0d348c8ad91a3afc220ac049420cb5c0b4992fd Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:08:19 +0100
-Subject: [PATCH 2/4] without x
+Subject: [PATCH 1/3] without x
 
 ---
  CMakeLists.txt                                |  1 +
@@ -41,10 +41,10 @@ index e1ec9107d..789c0e72d 100644
    endif()
  endif()
 diff --git a/UI/frontend-plugins/aja-output-ui/CMakeLists.txt b/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
-index fb6bb0b1c..76353ea39 100644
+index c3c14c7b3..ebdc07961 100644
 --- a/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
 +++ b/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
-@@ -77,9 +77,7 @@ elseif(OS_WINDOWS)
+@@ -75,9 +75,7 @@ elseif(OS_WINDOWS)
    target_link_libraries(aja-output-ui PRIVATE ws2_32.lib setupapi.lib Winmm.lib
                                                netapi32.lib Shlwapi.lib)
  else()
@@ -71,10 +71,10 @@ index 9f8b5a0e4..565b073cc 100644
    set(MODULE_DESCRIPTION "OBS DeckLink Captions module")
    configure_file(${CMAKE_SOURCE_DIR}/cmake/bundle/windows/obs-module.rc.in
 diff --git a/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt b/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
-index d83542ef0..39afb706c 100644
+index cfc929bb2..4050117d6 100644
 --- a/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
 +++ b/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
-@@ -64,8 +64,7 @@ elseif(OS_MACOS)
+@@ -62,8 +62,7 @@ elseif(OS_MACOS)
    target_link_libraries(decklink-output-ui PRIVATE ${COCOA})
  
  elseif(OS_POSIX)
@@ -85,10 +85,10 @@ index d83542ef0..39afb706c 100644
  endif()
  
 diff --git a/UI/frontend-plugins/frontend-tools/CMakeLists.txt b/UI/frontend-plugins/frontend-tools/CMakeLists.txt
-index aac98f90f..3da8702cf 100644
+index e7d78558d..a8c4aa027 100644
 --- a/UI/frontend-plugins/frontend-tools/CMakeLists.txt
 +++ b/UI/frontend-plugins/frontend-tools/CMakeLists.txt
-@@ -100,11 +100,16 @@ elseif(OS_MACOS)
+@@ -98,11 +98,16 @@ elseif(OS_MACOS)
                                PROPERTIES COMPILE_FLAGS -fobjc-arc)
  
  elseif(OS_POSIX)
@@ -136,10 +136,10 @@ similarity index 100%
 rename from UI/frontend-plugins/frontend-tools/auto-scene-switcher-nix.cpp
 rename to UI/frontend-plugins/frontend-tools/auto-scene-switcher-x11.cpp
 diff --git a/UI/obs-app.cpp b/UI/obs-app.cpp
-index e62a9700e..0d2af1696 100644
+index f24cb656c..375e92ddd 100644
 --- a/UI/obs-app.cpp
 +++ b/UI/obs-app.cpp
-@@ -1414,11 +1414,13 @@ bool OBSApp::OBSInit()
+@@ -1419,11 +1419,13 @@ bool OBSApp::OBSInit()
  	qRegisterMetaType<VoidFunc>();
  
  #if !defined(_WIN32) && !defined(__APPLE__)
@@ -316,10 +316,10 @@ index e87eb007e..d4375dab0 100644
  	case OBS_NIX_PLATFORM_WAYLAND:
  		gl_vtable = gl_wayland_egl_get_winsys_vtable();
 diff --git a/libobs/CMakeLists.txt b/libobs/CMakeLists.txt
-index 77043f8b7..d63bea717 100644
+index 8ef97a55f..90e0cb10a 100644
 --- a/libobs/CMakeLists.txt
 +++ b/libobs/CMakeLists.txt
-@@ -358,27 +358,16 @@ elseif(OS_POSIX)
+@@ -359,27 +359,16 @@ elseif(OS_POSIX)
      target_compile_definitions(libobs PRIVATE ENABLE_DARRAY_TYPE_TEST)
    endif()
  
@@ -347,7 +347,7 @@ index 77043f8b7..d63bea717 100644
    if(USE_XDG)
      target_compile_definitions(libobs PRIVATE USE_XDG)
    endif()
-@@ -407,8 +396,23 @@ elseif(OS_POSIX)
+@@ -408,8 +397,23 @@ elseif(OS_POSIX)
                                    util/platform-nix-portal.c)
    endif()
  
@@ -481,7 +481,7 @@ index 757fea3a0..6984f1bf3 100644
  if(NOT TARGET X11::Xcomposite)
    obs_status(FATAL_ERROR "linux-capture - Xcomposite library not found.")
 diff --git a/plugins/linux-pipewire/linux-pipewire.c b/plugins/linux-pipewire/linux-pipewire.c
-index edbb0c636..af4ad3f7f 100644
+index 98c21642e..a0ac8c36b 100644
 --- a/plugins/linux-pipewire/linux-pipewire.c
 +++ b/plugins/linux-pipewire/linux-pipewire.c
 @@ -40,12 +40,16 @@ bool obs_module_load(void)

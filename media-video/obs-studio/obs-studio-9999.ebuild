@@ -119,10 +119,9 @@ QA_PREBUILT="
 "
 
 PATCHES=(
-	"${FILESDIR}"/0001-fix-wayland.patch
-	"${FILESDIR}"/0002-without-x.patch
-	"${FILESDIR}"/0003-disable-browser-and-vst.patch
-	"${FILESDIR}"/0004-fix-rtmp.patch
+	"${FILESDIR}"/0001-without-x.patch
+	"${FILESDIR}"/0002-disable-browser-and-vst.patch
+	"${FILESDIR}"/0003-fix-rtmp.patch
 )
 
 pkg_setup() {
