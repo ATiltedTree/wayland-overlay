@@ -4,7 +4,7 @@
 EAPI="7"
 
 FIREFOX_PATCHSET="firefox-99-patches-03j.tar.xz"
-WAYLAND_PATCHSET="${PV}-r1"
+WAYLAND_PATCHSET="${PV}"
 
 LLVM_MAX_SLOT=14
 
@@ -112,14 +112,6 @@ BDEPEND="${PYTHON_DEPS}
 			clang? (
 				lto? ( =sys-devel/lld-12* )
 				pgo? ( =sys-libs/compiler-rt-sanitizers-12*[profile] )
-			)
-		)
-		(
-			sys-devel/clang:11
-			sys-devel/llvm:11
-			clang? (
-				lto? ( =sys-devel/lld-11* )
-				pgo? ( =sys-libs/compiler-rt-sanitizers-11*[profile] )
 			)
 		)
 	)
@@ -584,6 +576,9 @@ src_unpack() {
 
 src_prepare() {
 	use lto && rm -v "${WORKDIR}"/firefox-patches/*-LTO-Only-enable-LTO-*.patch
+	rm -v "${WORKDIR}"/firefox-patches/0007-Support-sndio-audio-framework.patch
+	rm -v "${WORKDIR}"/firefox-patches/0034-bmo-1758610-undefined-reference-to-VideoFramePool.patch
+	rm -v "${WORKDIR}"/firefox-patches/0035-bmo-1758610-update-VideoFramePool.patch
 	eapply "${WORKDIR}/firefox-patches"
 	eapply "${WORKDIR}/firefox-wayland-${WAYLAND_PATCHSET}"
 
