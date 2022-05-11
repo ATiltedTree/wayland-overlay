@@ -1,4 +1,4 @@
-From 707c3d106456e2a9ab5ba0965be38ef3eb9d2155 Mon Sep 17 00:00:00 2001
+From c817edc583b25d130b3f893db67eb798c8864580 Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:22:16 +0100
 Subject: [PATCH 2/3] disable browser and vst

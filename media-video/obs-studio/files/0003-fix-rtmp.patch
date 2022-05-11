@@ -1,4 +1,4 @@
-From 831908c58a430846359ff330ee703cdc8fec0d0e Mon Sep 17 00:00:00 2001
+From f2f9307afa9264163be2ef9f8a987679827096d4 Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:52:08 +0100
 Subject: [PATCH 3/3] fix rtmp
@@ -8,7 +8,7 @@ Subject: [PATCH 3/3] fix rtmp
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/plugins/obs-outputs/CMakeLists.txt b/plugins/obs-outputs/CMakeLists.txt
-index 124df673f..77f5626cc 100644
+index cde40922f..f4626de0f 100644
 --- a/plugins/obs-outputs/CMakeLists.txt
 +++ b/plugins/obs-outputs/CMakeLists.txt
 @@ -47,11 +47,11 @@ if(OS_WINDOWS)
