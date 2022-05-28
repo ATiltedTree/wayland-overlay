@@ -21,6 +21,7 @@ DEPEND="
 		media-libs/gst-plugins-base:1.0 )
 	>=app-arch/gnome-autoar-0.4.0
 	>=gnome-base/gnome-desktop-3.0.0:3=
+	>=gnome-base/gsettings-desktop-schemas-42
 	>=x11-libs/gtk+-3.22.27:3[introspection?]
 	>=gui-libs/libhandy-1.5.0:1
 	>=x11-libs/pango-1.28.3
@@ -30,7 +31,6 @@ DEPEND="
 	introspection? ( >=dev-libs/gobject-introspection-1.54:= )
 "
 RDEPEND="${DEPEND}
-	gstreamer? ( !<media-video/totem-3.31.91[nautilus] )
 	>=app-misc/tracker-miners-3.0:3=
 " # uses org.freedesktop.Tracker.Miner.Files gsettings schema from tracker-miners
 BDEPEND="
