@@ -1,4 +1,4 @@
-From 12ea4b7b75b39d72910698aa29d5a5410b0ae2b9 Mon Sep 17 00:00:00 2001
+From e24beaed12fb008bda77d1ff6abf3e9715128bd2 Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:08:19 +0100
 Subject: [PATCH 1/3] without x
@@ -13,27 +13,27 @@ Subject: [PATCH 1/3] without x
  ...er-nix.cpp => auto-scene-switcher-x11.cpp} |  0
  UI/obs-app.cpp                                |  2 ++
  UI/qt-wrappers.cpp                            |  2 ++
- deps/glad/CMakeLists.txt                      | 14 ++++-----
+ deps/glad/CMakeLists.txt                      |  4 +--
  deps/glad/src/glad.c                          | 17 +----------
- libobs-opengl/CMakeLists.txt                  | 18 ++++++-----
+ libobs-opengl/CMakeLists.txt                  | 17 +++++++----
  libobs-opengl/gl-nix.c                        |  5 ++++
  libobs/CMakeLists.txt                         | 30 +++++++++++--------
- libobs/obs-nix-platform.c                     |  2 +-
- libobs/obs-nix-platform.h                     |  4 ++-
+ libobs/obs-nix-platform.c                     |  5 +---
+ libobs/obs-nix-platform.h                     |  5 ++--
  libobs/obs-nix.c                              |  7 +++++
  libobs/obsconfig.h.in                         |  1 +
  plugins/linux-capture/CMakeLists.txt          |  5 ++++
  plugins/linux-pipewire/linux-pipewire.c       |  4 +++
- 20 files changed, 93 insertions(+), 58 deletions(-)
+ 20 files changed, 88 insertions(+), 56 deletions(-)
  create mode 100644 UI/frontend-plugins/frontend-tools/auto-scene-switcher-wayland.cpp
  rename UI/frontend-plugins/frontend-tools/{auto-scene-switcher-nix.cpp => auto-scene-switcher-x11.cpp} (100%)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index e5b56abcc..33daca58d 100644
+index c8a54ed96..b91836582 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -61,6 +61,7 @@ elseif(OS_POSIX)
-   option(USE_XDG "Utilize XDG Base Directory Specification (Linux)" ON)
+@@ -62,6 +62,7 @@ elseif(OS_POSIX)
+   option(ENABLE_PULSEAUDIO "Enable PulseAudio support" ON)
    if(OS_LINUX)
      option(ENABLE_WAYLAND "Enable building with support for Wayland (Linux)" ON)
 +    option(ENABLE_X11 "Enable building with support for X11 (Linux)" OFF)
@@ -136,16 +136,15 @@ similarity index 100%
 rename from UI/frontend-plugins/frontend-tools/auto-scene-switcher-nix.cpp
 rename to UI/frontend-plugins/frontend-tools/auto-scene-switcher-x11.cpp
 diff --git a/UI/obs-app.cpp b/UI/obs-app.cpp
-index f1d0500f4..4c0890abb 100644
+index a3bc5dfb6..b72bdc248 100644
 --- a/UI/obs-app.cpp
 +++ b/UI/obs-app.cpp
-@@ -1419,11 +1419,13 @@ bool OBSApp::OBSInit()
+@@ -1419,10 +1419,12 @@ bool OBSApp::OBSInit()
  	qRegisterMetaType<VoidFunc>();
  
  #if !defined(_WIN32) && !defined(__APPLE__)
 +#ifdef ENABLE_X11
- 	obs_set_nix_platform(OBS_NIX_PLATFORM_X11_GLX);
- 	if (QApplication::platformName() == "xcb" && getenv("OBS_USE_EGL")) {
+ 	if (QApplication::platformName() == "xcb") {
  		obs_set_nix_platform(OBS_NIX_PLATFORM_X11_EGL);
  		blog(LOG_INFO, "Using EGL/X11");
  	}
@@ -154,15 +153,14 @@ index f1d0500f4..4c0890abb 100644
  #ifdef ENABLE_WAYLAND
  	if (QApplication::platformName().contains("wayland")) {
 diff --git a/UI/qt-wrappers.cpp b/UI/qt-wrappers.cpp
-index c0bb30758..633e9e5f6 100644
+index f2f93ed3b..53faf9a7e 100644
 --- a/UI/qt-wrappers.cpp
 +++ b/UI/qt-wrappers.cpp
-@@ -121,11 +121,13 @@ bool QTToGSWindow(QWindow *window, gs_window &gswindow)
+@@ -122,10 +122,12 @@ bool QTToGSWindow(QWindow *window, gs_window &gswindow)
  	gswindow.view = (id)window->winId();
  #else
  	switch (obs_get_nix_platform()) {
 +#ifdef ENABLE_X11
- 	case OBS_NIX_PLATFORM_X11_GLX:
  	case OBS_NIX_PLATFORM_X11_EGL:
  		gswindow.id = window->winId();
  		gswindow.display = obs_get_nix_platform_display();
@@ -172,7 +170,7 @@ index c0bb30758..633e9e5f6 100644
  	case OBS_NIX_PLATFORM_WAYLAND:
  		QPlatformNativeInterface *native =
 diff --git a/deps/glad/CMakeLists.txt b/deps/glad/CMakeLists.txt
-index b23f10f2c..cb7b92086 100644
+index 0e49e1d8d..d4b60eab7 100644
 --- a/deps/glad/CMakeLists.txt
 +++ b/deps/glad/CMakeLists.txt
 @@ -1,6 +1,6 @@
@@ -192,24 +190,6 @@ index b23f10f2c..cb7b92086 100644
  set_target_properties(
    glad
    PROPERTIES OUTPUT_NAME obsglad
-@@ -29,12 +27,12 @@ if(OS_WINDOWS)
-   target_sources(glad PRIVATE src/glad_wgl.c include/glad/glad_wgl.h obsglad.rc)
- 
- elseif(OS_POSIX AND NOT OS_MACOS)
--  find_package(OpenGL REQUIRED)
--  find_package(X11 REQUIRED)
--
--  target_link_libraries(glad PRIVATE X11::X11)
-+  if(ENABLE_X11)
-+    find_package(X11 REQUIRED)
-+    target_sources(glad PRIVATE src/glad_glx.c include/glad/glad_glx.h)
- 
--  target_sources(glad PRIVATE src/glad_glx.c include/glad/glad_glx.h)
-+    target_link_libraries(glad PRIVATE X11::X11)
-+  endif()
- 
-   if(TARGET OpenGL::EGL)
-     target_sources(glad PRIVATE src/glad_egl.c include/glad/glad_egl.h)
 diff --git a/deps/glad/src/glad.c b/deps/glad/src/glad.c
 index 8fc9f8f53..528ca60a6 100644
 --- a/deps/glad/src/glad.c
@@ -261,10 +241,10 @@ index 8fc9f8f53..528ca60a6 100644
  #ifdef _WIN32
          result = (void*)GetProcAddress(libGL, namez);
 diff --git a/libobs-opengl/CMakeLists.txt b/libobs-opengl/CMakeLists.txt
-index 70e2f7f81..7f2f6a57d 100644
+index 78642d8bf..cb3101fb0 100644
 --- a/libobs-opengl/CMakeLists.txt
 +++ b/libobs-opengl/CMakeLists.txt
-@@ -46,16 +46,20 @@ elseif(OS_MACOS)
+@@ -46,15 +46,20 @@ elseif(OS_MACOS)
    set_target_properties(libobs-opengl PROPERTIES PREFIX "")
  
  elseif(OS_POSIX)
@@ -273,8 +253,7 @@ index 70e2f7f81..7f2f6a57d 100644
 -  find_package(X11_XCB REQUIRED)
 +  target_sources(libobs-opengl PRIVATE gl-egl-common.c gl-nix.c)
  
--  target_sources(libobs-opengl PRIVATE gl-egl-common.c gl-nix.c gl-x11-egl.c
--                                       gl-x11-glx.c)
+-  target_sources(libobs-opengl PRIVATE gl-egl-common.c gl-nix.c gl-x11-egl.c)
 +  set_target_properties(libobs-opengl PROPERTIES PREFIX "")
  
 -  target_link_libraries(libobs-opengl PRIVATE XCB::XCB X11::X11_xcb)
@@ -283,7 +262,7 @@ index 70e2f7f81..7f2f6a57d 100644
 +    find_package(XCB COMPONENTS XCB)
 +    find_package(X11_XCB REQUIRED)
 +
-+    target_sources(libobs-opengl PRIVATE gl-x11-egl.c gl-x11-glx.c)
++    target_sources(libobs-opengl PRIVATE gl-x11-egl.c)
 +
 +    target_link_libraries(libobs-opengl PRIVATE XCB::XCB X11::X11_xcb)
 +  endif()
@@ -293,29 +272,25 @@ index 70e2f7f81..7f2f6a57d 100644
    if(ENABLE_WAYLAND)
      find_package(
 diff --git a/libobs-opengl/gl-nix.c b/libobs-opengl/gl-nix.c
-index e87eb007e..d4375dab0 100644
+index 846524932..58a99cc6f 100644
 --- a/libobs-opengl/gl-nix.c
 +++ b/libobs-opengl/gl-nix.c
-@@ -16,8 +16,11 @@
+@@ -16,7 +16,10 @@
  ******************************************************************************/
  
  #include "gl-nix.h"
 +
 +#ifdef ENABLE_X11
- #include "gl-x11-glx.h"
  #include "gl-x11-egl.h"
 +#endif
  
  #ifdef ENABLE_WAYLAND
  #include "gl-wayland-egl.h"
-@@ -30,12 +33,14 @@ static void init_winsys(void)
+@@ -29,9 +32,11 @@ static void init_winsys(void)
  	assert(gl_vtable == NULL);
  
  	switch (obs_get_nix_platform()) {
 +#ifdef ENABLE_X11
- 	case OBS_NIX_PLATFORM_X11_GLX:
- 		gl_vtable = gl_x11_glx_get_winsys_vtable();
- 		break;
  	case OBS_NIX_PLATFORM_X11_EGL:
  		gl_vtable = gl_x11_egl_get_winsys_vtable();
  		break;
@@ -324,7 +299,7 @@ index e87eb007e..d4375dab0 100644
  	case OBS_NIX_PLATFORM_WAYLAND:
  		gl_vtable = gl_wayland_egl_get_winsys_vtable();
 diff --git a/libobs/CMakeLists.txt b/libobs/CMakeLists.txt
-index 636555352..557998ba9 100644
+index a8ed8b23a..376447252 100644
 --- a/libobs/CMakeLists.txt
 +++ b/libobs/CMakeLists.txt
 @@ -361,27 +361,16 @@ elseif(OS_POSIX)
@@ -355,7 +330,7 @@ index 636555352..557998ba9 100644
    if(USE_XDG)
      target_compile_definitions(libobs PRIVATE USE_XDG)
    endif()
-@@ -410,8 +399,23 @@ elseif(OS_POSIX)
+@@ -411,8 +400,23 @@ elseif(OS_POSIX)
                                    util/platform-nix-portal.c)
    endif()
  
@@ -382,23 +357,31 @@ index 636555352..557998ba9 100644
  
    if(ENABLE_WAYLAND)
 diff --git a/libobs/obs-nix-platform.c b/libobs/obs-nix-platform.c
-index e07a4d7b8..b67e57946 100644
+index 52a8d841f..b67e57946 100644
 --- a/libobs/obs-nix-platform.c
 +++ b/libobs/obs-nix-platform.c
-@@ -17,7 +17,7 @@
+@@ -17,15 +17,12 @@
  
  #include "obs-nix-platform.h"
  
--static enum obs_nix_platform_type obs_nix_platform = OBS_NIX_PLATFORM_X11_GLX;
+-#include <assert.h>
+-
+-static enum obs_nix_platform_type obs_nix_platform = OBS_NIX_PLATFORM_X11_EGL;
 +static enum obs_nix_platform_type obs_nix_platform;
  
  static void *obs_nix_platform_display = NULL;
  
+ void obs_set_nix_platform(enum obs_nix_platform_type platform)
+ {
+-	assert(platform != OBS_NIX_PLATFORM_X11_GLX);
+ 	obs_nix_platform = platform;
+ }
+ 
 diff --git a/libobs/obs-nix-platform.h b/libobs/obs-nix-platform.h
-index cef700d77..0ff0b0620 100644
+index 0c6375117..455af03f3 100644
 --- a/libobs/obs-nix-platform.h
 +++ b/libobs/obs-nix-platform.h
-@@ -18,18 +18,20 @@
+@@ -18,18 +18,19 @@
  #pragma once
  
  #include "util/c99defs.h"
@@ -409,8 +392,8 @@ index cef700d77..0ff0b0620 100644
  #endif
  
  enum obs_nix_platform_type {
+-	OBS_NIX_PLATFORM_X11_GLX OBS_DEPRECATED,
 +#ifdef ENABLE_X11
- 	OBS_NIX_PLATFORM_X11_GLX,
  	OBS_NIX_PLATFORM_X11_EGL,
 +#endif
  #ifdef ENABLE_WAYLAND
@@ -421,7 +404,7 @@ index cef700d77..0ff0b0620 100644
  
  /**
 diff --git a/libobs/obs-nix.c b/libobs/obs-nix.c
-index 93827ca37..71c21908b 100644
+index 71a215d47..2aa8aead0 100644
 --- a/libobs/obs-nix.c
 +++ b/libobs/obs-nix.c
 @@ -19,7 +19,10 @@
@@ -435,12 +418,11 @@ index 93827ca37..71c21908b 100644
  
  #ifdef ENABLE_WAYLAND
  #include "obs-nix-wayland.h"
-@@ -327,10 +330,12 @@ void log_system_info(void)
+@@ -327,9 +330,11 @@ void log_system_info(void)
  	log_desktop_session_info();
  #endif
  	switch (obs_get_nix_platform()) {
 +#ifdef ENABLE_X11
- 	case OBS_NIX_PLATFORM_X11_GLX:
  	case OBS_NIX_PLATFORM_X11_EGL:
  		obs_nix_x11_log_info();
  		break;
@@ -448,12 +430,11 @@ index 93827ca37..71c21908b 100644
  #ifdef ENABLE_WAYLAND
  	case OBS_NIX_PLATFORM_WAYLAND:
  		break;
-@@ -341,10 +346,12 @@ void log_system_info(void)
+@@ -340,9 +345,11 @@ void log_system_info(void)
  bool obs_hotkeys_platform_init(struct obs_core_hotkeys *hotkeys)
  {
  	switch (obs_get_nix_platform()) {
 +#ifdef ENABLE_X11
- 	case OBS_NIX_PLATFORM_X11_GLX:
  	case OBS_NIX_PLATFORM_X11_EGL:
  		hotkeys_vtable = obs_nix_x11_get_hotkeys_vtable();
  		break;
@@ -474,7 +455,7 @@ index 0ebd0eb0c..efb4abf2f 100644
  /* NOTE: Release candidate version numbers internally are always the previous
   * main release number!  For example, if the current public release is 21.0 and
 diff --git a/plugins/linux-capture/CMakeLists.txt b/plugins/linux-capture/CMakeLists.txt
-index 757fea3a0..6984f1bf3 100644
+index feb8077e8..6091db7c4 100644
 --- a/plugins/linux-capture/CMakeLists.txt
 +++ b/plugins/linux-capture/CMakeLists.txt
 @@ -1,5 +1,10 @@
@@ -486,13 +467,13 @@ index 757fea3a0..6984f1bf3 100644
 +endif()
 +
  find_package(X11 REQUIRED)
- if(NOT TARGET X11::Xcomposite)
-   obs_status(FATAL_ERROR "linux-capture - Xcomposite library not found.")
+ find_package(XCB COMPONENTS XCB XFIXES RANDR SHM XINERAMA COMPOSITE)
+ if(NOT TARGET XCB::COMPOSITE)
 diff --git a/plugins/linux-pipewire/linux-pipewire.c b/plugins/linux-pipewire/linux-pipewire.c
-index 98c21642e..a0ac8c36b 100644
+index 961fafaef..a80694493 100644
 --- a/plugins/linux-pipewire/linux-pipewire.c
 +++ b/plugins/linux-pipewire/linux-pipewire.c
-@@ -40,12 +40,16 @@ bool obs_module_load(void)
+@@ -40,10 +40,14 @@ bool obs_module_load(void)
  	switch (obs_get_nix_platform()) {
  #ifdef ENABLE_WAYLAND
  	case OBS_NIX_PLATFORM_WAYLAND:
@@ -502,8 +483,6 @@ index 98c21642e..a0ac8c36b 100644
 +#ifdef ENABLE_X11
  	case OBS_NIX_PLATFORM_X11_EGL:
  		pipewire_capture_load();
- 		break;
- 	case OBS_NIX_PLATFORM_X11_GLX:
  		break;
 +#endif
  	}
