@@ -1,13 +1,10 @@
-From e24beaed12fb008bda77d1ff6abf3e9715128bd2 Mon Sep 17 00:00:00 2001
+From 4c872c65a581c18b5c0e21d8d1c022647d807efb Mon Sep 17 00:00:00 2001
 From: Tilmann Meyer <me@atiltedtree.dev>
 Date: Fri, 4 Feb 2022 20:08:19 +0100
 Subject: [PATCH 1/3] without x
 
 ---
  CMakeLists.txt                                |  1 +
- .../aja-output-ui/CMakeLists.txt              |  4 +--
- .../decklink-captions/CMakeLists.txt          |  4 ---
- .../decklink-output-ui/CMakeLists.txt         |  3 +-
  .../frontend-tools/CMakeLists.txt             | 11 +++++--
  .../auto-scene-switcher-wayland.cpp           | 17 +++++++++++
  ...er-nix.cpp => auto-scene-switcher-x11.cpp} |  0
@@ -23,8 +20,7 @@ Subject: [PATCH 1/3] without x
  libobs/obs-nix.c                              |  7 +++++
  libobs/obsconfig.h.in                         |  1 +
  plugins/linux-capture/CMakeLists.txt          |  5 ++++
- plugins/linux-pipewire/linux-pipewire.c       |  4 +++
- 20 files changed, 88 insertions(+), 56 deletions(-)
+ 16 files changed, 82 insertions(+), 47 deletions(-)
  create mode 100644 UI/frontend-plugins/frontend-tools/auto-scene-switcher-wayland.cpp
  rename UI/frontend-plugins/frontend-tools/{auto-scene-switcher-nix.cpp => auto-scene-switcher-x11.cpp} (100%)
 
@@ -40,50 +36,6 @@ index c8a54ed96..b91836582 100644
      option(BUILD_FOR_PPA "Build for PPA distribution" OFF)
    endif()
  endif()
-diff --git a/UI/frontend-plugins/aja-output-ui/CMakeLists.txt b/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
-index c3c14c7b3..ebdc07961 100644
---- a/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
-+++ b/UI/frontend-plugins/aja-output-ui/CMakeLists.txt
-@@ -75,9 +75,7 @@ elseif(OS_WINDOWS)
-   target_link_libraries(aja-output-ui PRIVATE ws2_32.lib setupapi.lib Winmm.lib
-                                               netapi32.lib Shlwapi.lib)
- else()
--  find_package(X11 REQUIRED)
--  target_link_libraries(aja-output-ui PRIVATE X11::X11
--                                              Qt${QT_VERSION}::GuiPrivate)
-+  target_link_libraries(aja-output-ui PRIVATE Qt${QT_VERSION}::GuiPrivate)
- endif()
- 
- set_target_properties(aja-output-ui PROPERTIES FOLDER "frontend" PREFIX "")
-diff --git a/UI/frontend-plugins/decklink-captions/CMakeLists.txt b/UI/frontend-plugins/decklink-captions/CMakeLists.txt
-index 9f8b5a0e4..565b073cc 100644
---- a/UI/frontend-plugins/decklink-captions/CMakeLists.txt
-+++ b/UI/frontend-plugins/decklink-captions/CMakeLists.txt
-@@ -32,10 +32,6 @@ if(OS_MACOS)
-   mark_as_advanced(COCOA)
-   target_link_libraries(decklink-captions PRIVATE ${COCOA})
- 
--elseif(OS_POSIX)
--  find_package(X11 REQUIRED)
--  mark_as_advanced(X11)
--  target_link_libraries(decklink-captions PRIVATE X11::X11)
- elseif(OS_WINDOWS)
-   set(MODULE_DESCRIPTION "OBS DeckLink Captions module")
-   configure_file(${CMAKE_SOURCE_DIR}/cmake/bundle/windows/obs-module.rc.in
-diff --git a/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt b/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
-index cfc929bb2..4050117d6 100644
---- a/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
-+++ b/UI/frontend-plugins/decklink-output-ui/CMakeLists.txt
-@@ -62,8 +62,7 @@ elseif(OS_MACOS)
-   target_link_libraries(decklink-output-ui PRIVATE ${COCOA})
- 
- elseif(OS_POSIX)
--  find_package(X11 REQUIRED)
--  target_link_libraries(decklink-output-ui PRIVATE X11::X11
-+  target_link_libraries(decklink-output-ui PRIVATE
-                                                    Qt${QT_VERSION}::GuiPrivate)
- endif()
- 
 diff --git a/UI/frontend-plugins/frontend-tools/CMakeLists.txt b/UI/frontend-plugins/frontend-tools/CMakeLists.txt
 index e7d78558d..a8c4aa027 100644
 --- a/UI/frontend-plugins/frontend-tools/CMakeLists.txt
@@ -136,7 +88,7 @@ similarity index 100%
 rename from UI/frontend-plugins/frontend-tools/auto-scene-switcher-nix.cpp
 rename to UI/frontend-plugins/frontend-tools/auto-scene-switcher-x11.cpp
 diff --git a/UI/obs-app.cpp b/UI/obs-app.cpp
-index a3bc5dfb6..b72bdc248 100644
+index e84ae9e02..2785fad42 100644
 --- a/UI/obs-app.cpp
 +++ b/UI/obs-app.cpp
 @@ -1419,10 +1419,12 @@ bool OBSApp::OBSInit()
@@ -469,25 +421,6 @@ index feb8077e8..6091db7c4 100644
  find_package(X11 REQUIRED)
  find_package(XCB COMPONENTS XCB XFIXES RANDR SHM XINERAMA COMPOSITE)
  if(NOT TARGET XCB::COMPOSITE)
-diff --git a/plugins/linux-pipewire/linux-pipewire.c b/plugins/linux-pipewire/linux-pipewire.c
-index 961fafaef..a80694493 100644
---- a/plugins/linux-pipewire/linux-pipewire.c
-+++ b/plugins/linux-pipewire/linux-pipewire.c
-@@ -40,10 +40,14 @@ bool obs_module_load(void)
- 	switch (obs_get_nix_platform()) {
- #ifdef ENABLE_WAYLAND
- 	case OBS_NIX_PLATFORM_WAYLAND:
-+		pipewire_capture_load();
-+		break;
- #endif
-+#ifdef ENABLE_X11
- 	case OBS_NIX_PLATFORM_X11_EGL:
- 		pipewire_capture_load();
- 		break;
-+#endif
- 	}
- 
- 	return true;
 -- 
 2.35.1
 
